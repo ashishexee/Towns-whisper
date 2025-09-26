@@ -518,3 +518,513 @@ export class HomeScene extends Phaser.Scene {
         this.createObstacle(position.x, position.y, flowerType, 1, 1);
       }
     }
+
+    // --- Villagers Setup ---
+    this.villagers = this.physics.add.group({ immovable: true });
+
+    // --- New Dynamic Item Logic ---
+    const ALL_POSSIBLE_ITEMS = [
+        "FISHING_ROD", "AXE", "SHOVEL", "LANTERN",
+        "PICKAXE", "HAMMER", "BUCKET", "SCYTHE"
+    ];
+
+    Phaser.Utils.Array.Shuffle(ALL_POSSIBLE_ITEMS);
+    const currentGameItems = ALL_POSSIBLE_ITEMS.slice(0, 4);
+    console.log("Items for this game session:", currentGameItems);
+ 
+     const villagerSpriteMap = {
+         "villager_1": { tileX: 7, tileY: 9.5, texture: "villager04", scale: 0.069 },
+         "villager_5": { tileX: 15, tileY: 8, texture: "villager02", scale: 0.069 },
+         "villager_2": { tileX: 11, tileY: 16, texture: "villager03", scale: 0.069 },
+         "villager_3": { tileX: 17, tileY: 19.3, texture: "villager04", scale: 0.069 },
+         "villager_0": { tileX: 5, tileY: 3, texture: "villager03", scale: 0.069 },
+         "villager_4": { tileX: 21, tileY: 11.5, texture: "villager03", scale: 0.069 },
+         "villager_6": { tileX: 24.8, tileY: 8.7, texture: "villager02", scale: 0.069 },
+         "villager_7": { tileX: 26.2, tileY: 5, texture: "villager04", scale: 0.060 },
+     };
+ 
+    // Assign required_item only among villagers that will be rendered.
+    (function assignLocks(gameData, spriteMap, unlockItems) {
+        const availableIds = gameData.villagers
+            .map(v => v.id)
+            .filter(id => !!spriteMap[id]); // only those with sprites
+ 
+        Phaser.Utils.Array.Shuffle(availableIds);
+ 
+        const countToLock = Math.min(4, availableIds.length, unlockItems.length);
+        const villagersToLock = availableIds.slice(0, countToLock);
+ 
+        gameData.villagers.forEach(villager => {
+            const lockIndex = villagersToLock.indexOf(villager.id);
+            villager.required_item = lockIndex !== -1 ? unlockItems[lockIndex] : null;
+        });
+ 
+        console.log("Locked villagers (id -> required_item):",
+            gameData.villagers.filter(v => v.required_item).map(v => ({ id: v.id, required_item: v.required_item }))
+        );
+    })(this.gameData, villagerSpriteMap, currentGameItems);
+ 
+     this.gameData.villagers.forEach(villagerData => {
+         const spriteInfo = villagerSpriteMap[villagerData.id];
+         if (spriteInfo) {
+             this.createVillager(
+                 spriteInfo.tileX,
+                 spriteInfo.tileY,
+                 spriteInfo.texture,
+                 spriteInfo.scale,
+                 villagerData.id,
+                 villagerData.required_item
+             );
+         }
+     });
+ 
+    this.createObstacle(6, 0.3, "crop03", 2, 2);
+
+    this.createPlayer(1, 4.5);
+
+    this.cursors = this.input.keyboard.createCursorKeys();
+    this.wasd = this.input.keyboard.addKeys("W,S,A,D");
+
+    this.enterKey = this.input.keyboard.addKey(
+      Phaser.Input.Keyboard.KeyCodes.ENTER
+    );
+    this.interactionText = this.add
+      .text(0, 0, "Press ENTER to talk", {
+        fontFamily: "Arial",
+        fontSize: "16px",
+        color: "#ffffff",
+        backgroundColor: "rgba(0,0,0,0.7)",
+        padding: { x: 8, y: 4 },
+      })
+      .setOrigin(0.5, 1)
+      .setDepth(30)
+      .setVisible(false);
+
+    // --- New Minting Setup ---
+    this.mintKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.M);
+    this.mintText = this.add.text(0, 0, 'Press M to mint', {
+        fontFamily: 'Arial', fontSize: '16px', color: '#ffffff',
+        backgroundColor: 'rgba(0,0,0,0.7)', padding: { x: 8, y: 4 }
+    }).setOrigin(0.5, 1).setDepth(30).setVisible(false);
+
+    this.events.on('resume', () => {
+        if (this.input && this.input.keyboard) {
+            this.input.keyboard.enabled = true;
+        }
+    });
+
+    // --- Dynamic Minting Zone Creation ---
+    const ALL_MINT_ZONES = {
+        'FISHING_ROD': { x: 6, y: 10, width: 80, height: 80 },       // By the lake, on the path
+        'AXE': { x: 35.5, y: 15, width: 80, height: 80 },     // Edge of the forest, on the path
+        'SHOVEL': { x: 23, y: 9, width: 80, height: 80 },       // By the well, on the path
+        'LANTERN': { x: 28, y: 6, width: 80, height: 80 },      // At the church entrance, on the path
+        'PICKAXE': { x: 33, y: 16.5, width: 80, height: 80 },   // Near the forge, on the path
+        'HAMMER': { x: 37, y: 4, width: 80, height: 80 },       // By the windmill, on the path
+        'BUCKET': { x: 21, y: 13, width: 80, height: 80 },      // At the market, on the path
+        'SCYTHE': { x: 40.5, y: 4, width: 80, height: 80 }      // In the fields, on the path
+    };
+
+    currentGameItems.forEach(itemName => {
+        const zoneData = ALL_MINT_ZONES[itemName];
+        if (zoneData) {
+            this.createMintingZone(
+                zoneData.x * this.tileSize,
+                zoneData.y * this.tileSize,
+                zoneData.width,
+                zoneData.height,
+                itemName
+            );
+        }
+    });
+
+    this.setupResetPlayer();
+  }
+
+  isWalkableAt(worldX, worldY) {
+    const tileX = Math.floor(worldX / this.tileSize);
+    const tileY = Math.floor(worldY / this.tileSize);
+    if (this.walkableGrid[tileY] && this.walkableGrid[tileY][tileX]) {
+      return true;
+    }
+    return false;
+  }
+
+  createBuilding(tileX, tileY, texture, tileWidth = 4, tileHeight = 4) {
+    const pixelX = tileX * this.tileSize;
+    const pixelY = tileY * this.tileSize;
+    this.add
+      .image(pixelX, pixelY, texture)
+      .setOrigin(0)
+      .setDisplaySize(tileWidth * this.tileSize, tileHeight * this.tileSize)
+      .setPipeline("Light2D");
+    for (let y = Math.floor(tileY); y < Math.floor(tileY + tileHeight); y++) {
+      for (let x = Math.floor(tileX); x < Math.floor(tileX + tileWidth); x++) {
+        if (this.walkableGrid[y]) {
+          this.walkableGrid[y][x] = false;
+        }
+        if (this.occupiedGrid[y]) {
+          this.occupiedGrid[y][x] = true;
+        }
+      }
+    }
+  }
+
+  createObstacle(tileX, tileY, texture, tileWidth, tileHeight) {
+    const isForest = texture === "forest01" || texture === "forest02";
+    const tileSize = this.tileSize;
+
+    const effectiveTileWidth = isForest ? tileWidth * 6 : tileWidth;
+    const effectiveTileHeight = isForest ? tileHeight * 6 : tileHeight;
+
+    this.add
+      .image(tileX * tileSize, tileY * tileSize, texture)
+      .setOrigin(0)
+      .setDisplaySize(
+        effectiveTileWidth * tileSize,
+        effectiveTileHeight * tileSize
+      )
+      .setPipeline("Light2D");
+
+    for (
+      let y = Math.floor(tileY);
+      y < Math.floor(tileY + effectiveTileHeight);
+      y++
+    ) {
+      for (
+        let x = Math.floor(tileX);
+        x < Math.floor(tileX + effectiveTileWidth);
+        x++
+      ) {
+        if (this.occupiedGrid[y]) {
+          this.occupiedGrid[y][x] = true;
+        }
+      }
+    }
+  }
+
+  createLake(tileX, tileY, texture, tileWidth = 10, tileHeight = 10) {
+    this.createObstacle(tileX, tileY, texture, tileWidth, tileHeight);
+  }
+
+  createVillager(tileX, tileY, texture, scaleSize, id, requiredItem = null) {
+    const villager = this.villagers.create(
+      tileX * this.tileSize + 16,
+      tileY * this.tileSize + 16,
+      texture
+    );
+    villager
+      .setOrigin(0.5)
+      .setDisplaySize(32, 32)
+      .setScale(scaleSize)
+      .setPipeline("Light2D");
+
+    villager.name = id;
+    villager.requiredItem = requiredItem;
+
+    // Add a lock icon so locked villagers are visible in the world
+    if (requiredItem) {
+      const lockIcon = this.add.text(villager.x, villager.y - 25, '🔒', {
+        fontSize: '18px'
+      }).setOrigin(0.5).setDepth(31);
+      villager.lockIcon = lockIcon;
+      // hide initially if player already has the item
+      lockIcon.setVisible(!this.playerInventory.has(requiredItem));
+    } else {
+      villager.lockIcon = null;
+    }
+  }
+
+  createPlayer(tileX, tileY) {
+    const pixelX = tileX * this.tileSize + this.tileSize / 2;
+    const pixelY = tileY * this.tileSize + this.tileSize / 2;
+    // Store the initial position for the reset feature
+    this.initialPlayerPos = { x: pixelX, y: pixelY };
+    
+    this.player = this.physics.add
+      .sprite(pixelX, pixelY, "player")
+      .setOrigin(0.5)
+      .setDisplaySize(this.tileSize, this.tileSize)
+      .setScale(0.12)
+      .setPipeline("Light2D");
+    this.player.setCollideWorldBounds(true);
+    this.player.setDepth(10);
+
+    this.playerLight = this.lights
+      .addLight(pixelX, pixelY, 250)
+      .setColor(0xaaccff)
+      .setIntensity(2.0);
+  }
+
+  setupResetPlayer() {
+    this.resetKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.R);
+
+    this.resetFeedbackText = this.add.text(this.cameras.main.centerX, 50, '', {
+        fontFamily: 'Arial',
+        fontSize: '20px',
+        color: '#d4af37',
+        backgroundColor: 'rgba(0,0,0,0.7)',
+        padding: { x: 10, y: 5 }
+    }).setOrigin(0.5).setDepth(100).setVisible(false);
+
+    this.resetKey.on('down', () => {
+        this.resetFeedbackText.setText('Hold [R] for 1.5s to reset position...').setVisible(true);
+        // Start a timer to reset after 1.5 seconds
+        this.resetTimer = this.time.delayedCall(1500, () => {
+            this.player.setPosition(this.initialPlayerPos.x, this.initialPlayerPos.y);
+            this.resetFeedbackText.setText('Position has been reset!');
+            // Hide the message after another second
+            this.time.delayedCall(1000, () => {
+                this.resetFeedbackText.setVisible(false);
+            });
+        });
+    });
+
+    this.resetKey.on('up', () => {
+        if (this.resetTimer && this.resetTimer.getProgress() < 1) {
+            this.resetTimer.remove(false);
+            this.resetFeedbackText.setVisible(false);
+        }
+    });
+  }
+
+  handleInteraction() {
+    let closestVillager = null;
+    let minDistance = 50;
+
+    this.villagers.getChildren().forEach((villager) => {
+      const distance = Phaser.Math.Distance.Between(
+        this.player.x,
+        this.player.y,
+        villager.x,
+        villager.y
+      );
+      if (distance < minDistance) {
+        minDistance = distance;
+        closestVillager = villager;
+      }
+    });
+
+    this.nearbyVillager = closestVillager;
+
+    if (this.nearbyVillager) {
+      if (this.nearbyVillager.requiredItem && !this.playerInventory.has(this.nearbyVillager.requiredItem)) {
+        const itemName = this.nearbyVillager.requiredItem.replace(/_/g, ' ');
+        this.interactionText.setText(`Requires: ${itemName}`);
+      } else {
+        this.interactionText.setText("Press ENTER to talk");
+      }
+      this.interactionText.setVisible(true);
+      this.interactionText.setPosition(
+        this.nearbyVillager.x,
+        this.nearbyVillager.y - this.nearbyVillager.displayHeight / 2
+      );
+    } else {
+      this.interactionText.setVisible(false);
+    }
+
+    if (Phaser.Input.Keyboard.JustDown(this.enterKey) && this.nearbyVillager) {
+      // If villager requires an item, always launch the ItemLockScene
+      if (this.nearbyVillager.requiredItem) {
+        this.scene.pause();
+        this.scene.launch('ItemLockScene', {
+          villager: this.nearbyVillager,
+          suiClient: this.suiClient,
+          account: this.account,
+          gameData: this.gameData
+        });
+        return;
+      }
+      // Otherwise, proceed with the conversation
+      this.initiateConversation(this.nearbyVillager);
+    }
+  }
+
+  async initiateConversation(villager) {  
+    this.input.keyboard.enabled = false;
+    this.player.setVelocity(0, 0);
+
+    this.interactionText.setText("...");
+    this.sound.play("villager_accept", { volume: 6 });
+    console.log(villager.name);
+    
+    const conversationData = await getConversation(villager.name, "Hello");
+
+    this.input.keyboard.enabled = true;
+    this.interactionText.setText("Press ENTER to talk");
+
+    if (conversationData) {
+      this.scene.pause();
+      // CHANGE 3: Pass the stored this.gameData object to the DialogueScene.
+      this.scene.launch('DialogueScene', {
+        conversationData: conversationData,
+        newGameData: this.gameData, // Pass the whole stored object
+        villagerSpriteKey: villager.texture.key
+      });
+    } else {
+      console.error("Could not fetch conversation for villager:", villager.name);
+    }
+  }
+
+  update() {
+    if (!this.player) return;
+
+    // --- Handle Mint Zone Visibility ---
+    if (this.activeMintZone) {
+        const playerBounds = this.player.getBounds();
+        const zoneBounds = this.activeMintZone.getBounds();
+        if (!Phaser.Geom.Intersects.RectangleToRectangle(playerBounds, zoneBounds)) {
+            this.mintText.setVisible(false);
+            this.activeMintZone = null;
+        } else {
+            this.mintText.setPosition(this.player.x, this.player.y - 30);
+            this.mintText.setVisible(true);
+            // Continuously update the text based on current inventory state
+            this.updateMintZoneText(this.activeMintZone.itemName);
+        }
+    }
+
+    if (Phaser.Input.Keyboard.JustDown(this.mintKey) && this.activeMintZone) {
+        // Prevent minting if the item is already in the inventory
+        if (!this.playerInventory.has(this.activeMintZone.itemName)) {
+            this.mintItem(this.activeMintZone.itemName);
+        }
+    }
+
+    if (this.playerLight) {
+      this.playerLight.x = this.player.x;
+      this.playerLight.y = this.player.y;
+    }
+
+    const speed = 110;
+    let velocityX = 0;
+    let velocityY = 0;
+    if (this.cursors.left.isDown || this.wasd.A.isDown) {
+      velocityX = -speed;
+    } else if (this.cursors.right.isDown || this.wasd.D.isDown) {
+      velocityX = speed;
+    }
+    if (this.cursors.up.isDown || this.wasd.W.isDown) {
+      velocityY = -speed;
+    } else if (this.cursors.down.isDown || this.wasd.S.isDown) {
+      velocityY = speed;
+    }
+    if (velocityX !== 0 && velocityY !== 0) {
+      const magnitude = Math.sqrt(
+        velocityX * velocityX + velocityY * velocityY
+      );
+      velocityX = (velocityX / magnitude) * speed;
+      velocityY = (velocityY / magnitude) * speed;
+    }
+    const delta = this.game.loop.delta / 1000;
+    const nextX = this.player.x + velocityX * delta;
+    const nextY = this.player.y + velocityY * delta;
+    if (velocityX !== 0 || velocityY !== 0) {
+      if (this.isWalkableAt(nextX, nextY)) {
+        this.player.setVelocity(velocityX, velocityY);
+      } else {
+        this.player.setVelocity(0, 0);
+      }
+    } else {
+      this.player.setVelocity(0, 0);
+    }
+
+    // Keep lock icons positioned and visible only when the player lacks the required item
+    this.villagers.getChildren().forEach(villager => {
+        if (villager.lockIcon) {
+            villager.lockIcon.setPosition(villager.x, villager.y - 25);
+            const isLocked = !!villager.requiredItem;
+            villager.lockIcon.setVisible(isLocked);
+        }
+    });
+ 
+     this.handleInteraction();
+  }
+
+  // --- New Methods for Minting and Inventory ---
+
+  unlockVillager(villagerName) {
+    const villager = this.villagers.getChildren().find(v => v.name === villagerName);
+    if (villager) {
+        console.log(`Unlocking villager: ${villagerName}`);
+        villager.requiredItem = null;
+        // Force update inventory from blockchain after unlocking
+        this.updateInventory();
+    }
+  }
+
+  createMintingZone(x, y, width, height, itemName) {
+    const zone = this.add.zone(x, y, width, height).setOrigin(0);
+    this.physics.world.enable(zone);
+    zone.body.setAllowGravity(false);
+    zone.body.moves = false;
+    zone.itemName = itemName;
+
+    this.physics.add.overlap(this.player, zone, () => {
+        this.activeMintZone = zone;
+        // Make mint text yellow
+        this.mintText.setStyle({ color: '#ffff00' });
+        // Check inventory and update the minting prompt accordingly
+        this.updateMintZoneText(itemName);
+    });
+  }
+
+  updateMintZoneText(itemName) {
+    if (this.playerInventory.has(itemName)) {
+        this.mintText.setText(`You already own the ${itemName.replace(/_/g, ' ')}`);
+        this.mintText.setStyle({ color: '#888888' }); // Gray color for owned items
+    } else {
+        this.mintText.setText(`Press M to mint ${itemName.replace(/_/g, ' ')}`);
+        this.mintText.setStyle({ color: '#ffff00' }); // Yellow for available items
+    }
+  }
+
+  async mintItem(itemName) {
+    if (!this.account) {
+        console.error("Wallet not connected, cannot mint.");
+        return;
+    }
+
+    this.input.keyboard.enabled = false;
+    const mintingStatusText = this.add.text(this.cameras.main.centerX, this.cameras.main.centerY, `Minting ${itemName}...`, {
+        fontSize: '24px', color: '#d4af37', backgroundColor: 'rgba(0,0,0,0.8)', padding: { x: 20, y: 10 }
+    }).setOrigin(0.5).setDepth(101);
+
+    try {
+        // HERE the integration of an NFT minting function on an EVM contract is to be done.
+        console.log(`Simulating mint for: ${itemName}`);
+        await new Promise(resolve => setTimeout(resolve, 1500));
+
+        console.log("Mint successful!");
+        mintingStatusText.setText(`${itemName} minted successfully!`);
+        
+        this.playerInventory.add(itemName);
+        await this.updateInventory();
+        
+        if (this.activeMintZone && this.activeMintZone.itemName === itemName) {
+            this.mintText.setText(`You already own the ${itemName.replace(/_/g, ' ')}`);
+        }
+
+    } catch (error) {
+        console.error("Minting failed:", error);
+        mintingStatusText.setText(`Minting failed. See console for details.`);
+    } finally {
+        this.time.delayedCall(2000, () => {
+            mintingStatusText.destroy();
+            this.input.keyboard.enabled = true;
+        });
+    }
+  }
+
+  async updateInventory() {
+    if (!this.account) return;
+
+    try {
+        // HERE the integration of a function to fetch the player's NFTs from an EVM contract is to be done.
+        console.log("Simulating inventory update. Current inventory:", Array.from(this.playerInventory));
+
+    } catch (error) {
+        console.error("Failed to update inventory:", error);
+    }
+  }
+}
