@@ -1,12 +1,22 @@
 {
   "name": "bridge_server",
   "version": "1.0.0",
-  "description": "",
-  "license": "ISC",
-  "author": "",
-  "type": "commonjs",
-  "main": "index.js",
+  "description": "A service to bridge the Python backend of Echoes of the Village to the 0G Compute SDK.",
+  "main": "server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node server.js"
+  },
+  "keywords": [
+    "0g",
+    "ai",
+    "blockchain"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@0glabs/0g-serving-broker": "^0.1.2",
+    "dotenv": "^17.2.2",
+    "ethers": "6.13.1",
+    "express": "^4.19.2"
   }
 }
