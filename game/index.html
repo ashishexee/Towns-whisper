@@ -1,13 +1,32 @@
-<!doctype html>
+<!-- filepath: f:\Echoes-of-the-Village\game_onechain\index.html -->
+<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <title>Echoes of the Village (OneChain)</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>game</title>
+     <link href="/app.css" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Merriweather&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+      html, body {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        background: #1a1a1a;
+      }
+      /* The root div should take up the full screen */
+      #root {
+        width: 100%;
+        height: 100%;
+      }
+    </style>
   </head>
   <body>
+    <!-- This is where the React app will be mounted -->
     <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
+    <!-- Update the script source to point to main.jsx -->
+    <script type="module" src="./main.jsx"></script>
   </body>
-</html>
+</html> 
