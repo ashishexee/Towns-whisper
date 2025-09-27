@@ -807,84 +807,6 @@ export class HomeScene extends Phaser.Scene {
     });
   }
 
-  handleInteraction() {
-    let closestVillager = null;
-    let minDistance = 50;
-
-    this.villagers.getChildren().forEach((villager) => {
-      const distance = Phaser.Math.Distance.Between(
-        this.player.x,
-        this.player.y,
-        villager.x,
-        villager.y
-      );
-      if (distance < minDistance) {
-        minDistance = distance;
-        closestVillager = villager;
-      }
-    });
-
-    this.nearbyVillager = closestVillager;
-
-    if (this.nearbyVillager) {
-      if (this.nearbyVillager.requiredItem && !this.playerInventory.has(this.nearbyVillager.requiredItem)) {
-        const itemName = this.nearbyVillager.requiredItem.replace(/_/g, ' ');
-        this.interactionText.setText(`Requires: ${itemName}`);
-      } else {
-        this.interactionText.setText("Press ENTER to talk");
-      }
-      this.interactionText.setVisible(true);
-      this.interactionText.setPosition(
-        this.nearbyVillager.x,
-        this.nearbyVillager.y - this.nearbyVillager.displayHeight / 2
-      );
-    } else {
-      this.interactionText.setVisible(false);
-    }
-
-    if (Phaser.Input.Keyboard.JustDown(this.enterKey) && this.nearbyVillager) {
-      // If villager requires an item, always launch the ItemLockScene
-      if (this.nearbyVillager.requiredItem) {
-        this.scene.pause();
-        this.scene.launch('ItemLockScene', {
-          villager: this.nearbyVillager,
-          suiClient: this.suiClient,
-          account: this.account,
-          gameData: this.gameData
-        });
-        return;
-      }
-      // Otherwise, proceed with the conversation
-      this.initiateConversation(this.nearbyVillager);
-    }
-  }
-
-  async initiateConversation(villager) {  
-    this.input.keyboard.enabled = false;
-    this.player.setVelocity(0, 0);
-
-    this.interactionText.setText("...");
-    this.sound.play("villager_accept", { volume: 6 });
-    console.log(villager.name);
-    
-    const conversationData = await getConversation(villager.name, "Hello");
-
-    this.input.keyboard.enabled = true;
-    this.interactionText.setText("Press ENTER to talk");
-
-    if (conversationData) {
-      this.scene.pause();
-      // CHANGE 3: Pass the stored this.gameData object to the DialogueScene.
-      this.scene.launch('DialogueScene', {
-        conversationData: conversationData,
-        newGameData: this.gameData, // Pass the whole stored object
-        villagerSpriteKey: villager.texture.key
-      });
-    } else {
-      console.error("Could not fetch conversation for villager:", villager.name);
-    }
-  }
-
   update() {
     if (!this.player) return;
 
@@ -1001,7 +923,14 @@ export class HomeScene extends Phaser.Scene {
       }
     });
 
+    // Update interaction text visibility and content
     if (this.nearbyVillager) {
+      if (this.nearbyVillager.requiredItem && !this.playerInventory.has(this.nearbyVillager.requiredItem)) {
+        const itemName = this.nearbyVillager.requiredItem.replace(/_/g, ' ');
+        this.interactionText.setText(`Requires: ${itemName}`);
+      } else {
+        this.interactionText.setText("Press ENTER to talk");
+      }
       this.interactionText.setVisible(true);
       this.interactionText.setPosition(
         this.nearbyVillager.x,
@@ -1011,13 +940,74 @@ export class HomeScene extends Phaser.Scene {
       this.interactionText.setVisible(false);
     }
 
+    // Handle interaction when ENTER is pressed
     if (Phaser.Input.Keyboard.JustDown(this.enterKey) && this.nearbyVillager) {
-      this.handleInteraction();
+      this.startConversation();
     }
   }
 
-  // --- New Methods for Minting and Inventory ---
+  // Rename and simplify the interaction method
+  startConversation() {
+    if (!this.nearbyVillager) return;
 
+    // If villager requires an item and player doesn't have it
+    if (this.nearbyVillager.requiredItem && !this.playerInventory.has(this.nearbyVillager.requiredItem)) {
+      this.scene.pause();
+      this.scene.launch('ItemLockScene', {
+        villager: this.nearbyVillager,
+        account: this.account,
+        gameData: this.gameData
+      });
+      return;
+    }
+
+    // Start conversation
+    console.log(`Starting conversation with villager: ${this.nearbyVillager.name}`);
+    
+    // Disable input during conversation setup
+    this.input.keyboard.enabled = false;
+    this.player.setVelocity(0, 0);
+    
+    getConversation(this.nearbyVillager.name, "I'd like to talk.")
+      .then(conversationData => {
+        console.log("Conversation data received:", conversationData);
+        
+        if (conversationData && conversationData.npc_dialogue) {
+          // Launch dialogue scene
+          this.scene.launch("DialogueScene", {
+            conversationData: conversationData,
+            villagerSpriteKey: this.nearbyVillager.texture.key,
+            newGameData: this.gameData
+          });
+          this.scene.pause();
+        } else {
+          console.error("Invalid conversation data:", conversationData);
+          this.showErrorMessage("Unable to start conversation. Please try again.");
+          this.input.keyboard.enabled = true;
+        }
+      })
+      .catch(error => {
+        console.error("Error getting conversation:", error);
+        this.showErrorMessage("Network error. Please try again.");
+        this.input.keyboard.enabled = true;
+      });
+  }
+
+  showErrorMessage(message) {
+    const errorText = this.add.text(
+      this.cameras.main.centerX, 
+      this.cameras.main.centerY, 
+      message, 
+      { fontSize: '24px', color: '#ff4444', backgroundColor: 'rgba(0,0,0,0.8)', padding: { x: 20, y: 10 } }
+    ).setOrigin(0.5).setDepth(200);
+    
+    this.time.delayedCall(2000, () => {
+      errorText.destroy();
+    });
+  }
+
+  // Remove the old handleInteraction method and keep the simplified logic
+  // ...existing code...
   unlockVillager(villagerName) {
     const villager = this.villagers.getChildren().find(v => v.name === villagerName);
     if (villager) {
@@ -1101,5 +1091,52 @@ export class HomeScene extends Phaser.Scene {
     } catch (error) {
         console.error("Failed to update inventory:", error);
     }
+  }
+
+  handleVillagerInteraction(villagerSprite) {
+    const villagerId = villagerSprite.getData("villagerId");
+    console.log(`Interacting with villager: ${villagerId}`);
+    
+    // Check if we have conversation data
+    getConversation(villagerId, "I'd like to talk.").then(conversationData => {
+      console.log("Raw conversation response:", conversationData); // Add this line
+      
+      if (conversationData && conversationData.npc_dialogue) {
+        console.log("Conversation data received:", conversationData);
+        
+        // Launch dialogue scene with the conversation data
+        this.scene.launch("DialogueScene", {
+          conversationData: conversationData,
+          villagerSpriteKey: villagerSprite.texture.key,
+          newGameData: this.newGameData
+        });
+        this.scene.pause();
+      } else {
+        console.error("Failed to get conversation data or missing npc_dialogue:", conversationData);
+        // Show a temporary message to the user
+        const errorText = this.add.text(
+          this.cameras.main.centerX, 
+          this.cameras.main.centerY, 
+          "Unable to start conversation. Please try again.", 
+          { fontSize: '24px', color: '#ff4444' }
+        ).setOrigin(0.5);
+        
+        this.time.delayedCall(2000, () => {
+          errorText.destroy();
+        });
+      }
+    }).catch(error => {
+      console.error("Error getting conversation:", error);
+      const errorText = this.add.text(
+        this.cameras.main.centerX, 
+        this.cameras.main.centerY, 
+        "Network error. Please try again.", 
+        { fontSize: '24px', color: '#ff4444' }
+      ).setOrigin(0.5);
+      
+      this.time.delayedCall(2000, () => {
+        errorText.destroy();
+      });
+    });
   }
 }
