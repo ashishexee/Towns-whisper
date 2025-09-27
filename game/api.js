@@ -66,7 +66,10 @@ async function getConversation(villagerId, playerMessage, playerId = null) {
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(requestBody),
+      body: JSON.stringify({
+        villager_id: villagerId,
+        player_prompt: playerMessage, // CHANGED: was player_message
+      }),
     });
     
     if (!response.ok) {

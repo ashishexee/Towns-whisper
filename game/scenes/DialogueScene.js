@@ -17,38 +17,32 @@ export class DialogueScene extends Phaser.Scene {
     }
 
     init(data) {
-        console.log("DialogueScene init called with data:", data);
-        this.conversationData = data.conversationData;
-        this.villagerSpriteKey = data.villagerSpriteKey;
-        this.newGameData = data.newGameData;
-        this.playerId = data.playerId;
-        this.callingScene = data.callingScene || 'HomeScene'; // Default to HomeScene
-        
-        // Add validation
-        if (!this.conversationData) {
-            console.error("No conversation data provided to DialogueScene!");
-            this.closeDialogue();
-            return;
-        }
-        
-        if (!this.conversationData.npc_dialogue) {
-            console.error("No npc_dialogue in conversation data:", this.conversationData);
-            this.closeDialogue();
-            return;
-        }
+    console.log("DialogueScene init called with data:", data);
+    this.conversationData = data.conversationData;
+    this.villagerSpriteKey = data.villagerSpriteKey;
+    this.newGameData = data.newGameData;
+    
+    // Add validation
+    if (!this.conversationData) {
+        console.error("No conversation data provided to DialogueScene!");
+        return;
     }
+    
+    if (!this.conversationData.npc_dialogue) {
+        console.error("No npc_dialogue in conversation data:", this.conversationData);
+        return;
+    }
+}
 
     create() {
-        console.log("DialogueScene create - conversationData:", this.conversationData);
+        console.log("DialogueScene create - conversationData:", this.conversationData); // Add this line
         
         if (!this.conversationData) {
             console.error("No conversation data available!");
-            this.closeDialogue();
+            this.scene.stop();
+            this.scene.resume('HomeScene');
             return;
         }
-        
-        // Make sure this scene is on top
-        this.scene.bringToTop();
         
         this.initTTS();
         
@@ -97,42 +91,24 @@ export class DialogueScene extends Phaser.Scene {
             padding: { x: 10, y: 5 }
         }).setOrigin(0.5).setInteractive({ useHandCursor: true }).setDepth(20);
 
-        closeButton.on('pointerdown', () => {
-            this.closeDialogue();
-        });
+       closeButton.on('pointerdown', () => {
+    this.stopSpeaking();
+    this.scene.stop();
+    this.scene.resume('HomeScene');
+    
+    // Re-enable input in HomeScene
+    const homeScene = this.scene.get('HomeScene');
+    if (homeScene && homeScene.input && homeScene.input.keyboard) {
+        homeScene.input.keyboard.enabled = true;
+    }
+});
 
-        // Add ESC key to close dialogue
-        this.escKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
-        this.escKey.on('down', () => {
-            this.closeDialogue();
-        });
-
-        // Entry Animation
-        this.cameras.main.fadeIn(300, 0, 0, 0);
-        
-        console.log("DialogueScene created successfully with depth layers");
+        // --- Entry Animation ---
+        // Fade in the entire scene for a smooth transition
+        this.cameras.main.fadeIn(500, 0, 0, 0);
     }
 
-    closeDialogue() {
-        this.stopSpeaking();
-        this.scene.stop('DialogueScene');
-        
-        // Resume the appropriate scene
-        if (this.callingScene === 'MultiplayerScene') {
-            this.scene.resume('MultiplayerScene');
-            const multiplayerScene = this.scene.get('MultiplayerScene');
-            if (multiplayerScene && multiplayerScene.input && multiplayerScene.input.keyboard) {
-                multiplayerScene.input.keyboard.enabled = true;
-            }
-        } else {
-            this.scene.resume('HomeScene');
-            const homeScene = this.scene.get('HomeScene');
-            if (homeScene && homeScene.input && homeScene.input.keyboard) {
-                homeScene.input.keyboard.enabled = true;
-            }
-        }
-    }
-
+    
     initTTS() {
         if (!('speechSynthesis' in window)) return;
         const populateVoiceList = () => {

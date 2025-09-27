@@ -9,7 +9,9 @@ import uuid
 import json
 from typing import Dict, List
 from game_logic.engine import GameEngine
-import os
+from game_logic.state_manager import GameState
+# Import our new Hedera service function
+# -------------------------
 
 app = FastAPI()
 
