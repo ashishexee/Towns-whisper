@@ -755,7 +755,7 @@ export class HomeScene extends Phaser.Scene {
       .sprite(pixelX, pixelY, "player")
       .setOrigin(0.5)
       .setDisplaySize(this.tileSize, this.tileSize)
-      .setScale(0.12)
+      .setScale(0.01)
       .setPipeline("Light2D");
     this.player.setCollideWorldBounds(true);
     this.player.setDepth(10);
