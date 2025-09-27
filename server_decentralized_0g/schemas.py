@@ -1,10 +1,10 @@
 # schemas.py
 # This file defines the Pydantic models for API request and response validation.
-# It ensures that data flowing in and out of the API is well-structured.
 
 from pydantic import BaseModel
 from typing import List, Dict, Optional
 
+# Game-related schemas
 class NewGameRequest(BaseModel):
     difficulty: str = "medium"
     num_inaccessible_locations: int = 5
@@ -32,3 +32,16 @@ class GuessResponse(BaseModel):
     is_correct: bool
     is_true_ending: bool
     message: str
+
+# Chest/Reward system schemas
+class OpenChestRequest(BaseModel):
+    """Request for opening any type of chest"""
+    player_account_id: str
+
+class ChestResponse(BaseModel):
+    """Response for chest operations"""
+    status: str
+    message: str
+    amount: Optional[int] = None
+    schedule_id: Optional[str] = None
+    execution_time: Optional[str] = None

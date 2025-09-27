@@ -8,15 +8,15 @@ let currentGameId = null;
  */
 async function startNewGame(difficulty) {
   try {
-    console.log("Difficulty level - ",difficulty);
+    console.log("Difficulty level - ", difficulty);
     const response = await fetch(`${API_BASE_URL}/game/new`, {
       method: 'POST',
       headers: {
-      'Content-Type': 'application/json',
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-      difficulty: difficulty,
-      num_inaccessible_locations: 5,
+        difficulty: difficulty,
+        num_inaccessible_locations: 5,
       }),
     });
 
@@ -43,12 +43,24 @@ async function startNewGame(difficulty) {
  * @param {string} playerMessage The message or suggestion chosen by the player.
  * @returns {Promise<object|null>} The conversation data, or null if it fails.
  */
-async function getConversation(villagerId, playerMessage) {
+async function getConversation(villagerId, playerMessage, playerId = null) {
   if (!currentGameId) {
     console.error("Cannot get conversation: no active game ID.");
     return null;
   }
+  
   try {
+    const requestBody = {
+      villager_id: villagerId,
+      player_prompt: playerMessage,
+    };
+    
+    if (playerId) {
+      requestBody.player_id = playerId;
+    }
+    
+    console.log('Sending conversation request:', requestBody);
+    
     const response = await fetch(`${API_BASE_URL}/game/${currentGameId}/interact`, {
       method: "POST",
       headers: {
@@ -59,13 +71,21 @@ async function getConversation(villagerId, playerMessage) {
         player_prompt: playerMessage, // CHANGED: was player_message
       }),
     });
-    console.log(response);
     
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
 
-    return await response.json();
+    const data = await response.json();
+    console.log('Received conversation response:', data);
+    
+    // Validate the response structure
+    if (!data.npc_dialogue) {
+      console.error('Invalid response structure - missing npc_dialogue:', data);
+      return null;
+    }
+    
+    return data;
   } catch (error) {
     console.error("Error getting conversation:", error);
     return null;
@@ -77,21 +97,27 @@ async function getConversation(villagerId, playerMessage) {
  * @param {string} location The name of the location chosen by the player.
  * @returns {Promise<object|null>} The server's response, or null if it fails.
  */
-async function chooseLocation(location) {
+async function chooseLocation(location, playerId = null) {
   if (!currentGameId) {
     console.error("Cannot choose location: no active game ID.");
     return null;
   }
 
   try {
+    const requestBody = {
+      location_name: location,
+    };
+    
+    if (playerId) {
+      requestBody.player_id = playerId;
+    }
+    
     const response = await fetch(`${API_BASE_URL}/game/${currentGameId}/guess`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        location_name: location,
-      }),
+      body: JSON.stringify(requestBody),
     });
 
     if (!response.ok) {
@@ -108,22 +134,194 @@ async function chooseLocation(location) {
 }
 
 /**
- * Pings the server to wake it up if it's on a free hosting service.
+ * Sets the current game ID.
+ * @param {string} gameId The game ID to set as current.
  */
- async function pingServer() {
+async function pingServer() {
   try {
     console.log("Pinging server to wake it up...");
-    const response = await fetch(`${API_BASE_URL}/ping/`);
+    const response = await fetch(`${API_BASE_URL}/ping`);
     if (!response.ok) {
       throw new Error(`Ping failed with status: ${response.status}`);
     }
-    const data =  await response.json();
+    const data = await response.json();
     console.log("Server responded to ping:", data.message);
   } catch (error) {
-    // This is not a critical error, so we just warn about it.
-    console.warn("Server ping failed (this is not critical):", error);
+    console.error("Error pinging server:", error);
+    return false;
   }
 }
 
-// Export the functions to be used in your game scenes
-export { startNewGame, getConversation, chooseLocation, pingServer };
+/**
+ * Calls the backend to schedule a victory reward chest for the player.
+ * @param {string} hederaAccountId The player's Hedera account ID (e.g., "0.0.12345").
+ * @returns {Promise<object|null>} The server's response, or null if it fails.
+ */
+async function openRewardChest(hederaAccountId) {
+  try {
+    const response = await fetch(`${API_BASE_URL}/chest/open`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        player_account_id: hederaAccountId,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(`HTTP error! status: ${response.status} - ${errorData.detail}`);
+    }
+
+    return await response.json();
+
+  } catch (error) {
+    console.error("Error opening reward chest:", error);
+    return null;
+  }
+}
+
+/**
+ * Get the Rune Token balance for a player's Hedera account.
+ * @param {string} hederaAccountId The player's Hedera account ID (e.g., "0.0.12345").
+ * @returns {Promise<object|null>} The balance data, or null if it fails.
+ */
+async function getTokenBalance(hederaAccountId) {
+  try {
+    console.log(`Getting token balance for account: ${hederaAccountId}`);
+    const response = await fetch(`${API_BASE_URL}/balance/${hederaAccountId}`);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log("Token balance retrieved:", data);
+    return data;
+
+  } catch (error) {
+    console.error("Error getting token balance:", error);
+    return null;
+  }
+}
+
+/**
+ * Claim welcome bonus (250 Rune tokens) for first-time users.
+ * @param {string} hederaAccountId The player's Hedera account ID (e.g., "0.0.12345").
+ * @returns {Promise<object|null>} The server's response, or null if it fails.
+ */
+async function claimWelcomeBonus(hederaAccountId) {
+  try {
+    console.log(`Claiming welcome bonus for account: ${hederaAccountId}`);
+    const response = await fetch(`${API_BASE_URL}/chest/welcome`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        player_account_id: hederaAccountId,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(`HTTP error! status: ${response.status} - ${errorData.detail}`);
+    }
+
+    const data = await response.json();
+    console.log("Welcome bonus claimed:", data);
+    return data;
+
+  } catch (error) {
+    console.error("Error claiming welcome bonus:", error);
+    return null;
+  }
+}
+
+/**
+ * Claim daily login reward (50-200 Rune tokens) if 24 hours have passed.
+ * @param {string} hederaAccountId The player's Hedera account ID (e.g., "0.0.12345").
+ * @returns {Promise<object|null>} The server's response, or null if it fails.
+ */
+async function claimDailyReward(hederaAccountId) {
+  try {
+    console.log(`Claiming daily reward for account: ${hederaAccountId}`);
+    const response = await fetch(`${API_BASE_URL}/chest/daily`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        player_account_id: hederaAccountId,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(`HTTP error! status: ${response.status} - ${errorData.detail}`);
+    }
+
+    const data = await response.json();
+    console.log("Daily reward claimed:", data);
+    return data;
+
+  } catch (error) {
+    console.error("Error claiming daily reward:", error);
+    return null;
+  }
+}
+
+/**
+ * Check if the player is eligible for welcome bonus (hasn't claimed it yet).
+ * @param {string} hederaAccountId The player's Hedera account ID.
+ * @returns {Promise<boolean>} True if eligible, false otherwise.
+ */
+async function isEligibleForWelcomeBonus(hederaAccountId) {
+  try {
+    // Try to claim welcome bonus - if it fails due to already claimed, return false
+    const result = await claimWelcomeBonus(hederaAccountId);
+    return result && result.status === 'success';
+  } catch (error) {
+    // If error contains "already claimed", return false
+    if (error.message.includes('already claimed')) {
+      return false;
+    }
+    console.error("Error checking welcome bonus eligibility:", error);
+    return false;
+  }
+}
+
+/**
+ * Check if the player is eligible for daily reward (24 hours have passed).
+ * @param {string} hederaAccountId The player's Hedera account ID.
+ * @returns {Promise<boolean>} True if eligible, false otherwise.
+ */
+async function isEligibleForDailyReward(hederaAccountId) {
+  try {
+    // Try to claim daily reward - if it fails due to cooldown, return false
+    const result = await claimDailyReward(hederaAccountId);
+    return result && result.status === 'success';
+  } catch (error) {
+    // If error contains "already claimed" or "Try again in", return false
+    if (error.message.includes('already claimed') || error.message.includes('Try again in')) {
+      return false;
+    }
+    console.error("Error checking daily reward eligibility:", error);
+    return false;
+  }
+}
+
+// Export all functions
+export { 
+  startNewGame, 
+  getConversation, 
+  chooseLocation, 
+  pingServer, 
+  openRewardChest,
+  getTokenBalance,
+  claimWelcomeBonus,
+  claimDailyReward,
+  isEligibleForWelcomeBonus,
+  isEligibleForDailyReward
+};

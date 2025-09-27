@@ -1,5 +1,5 @@
 import Phaser from "phaser";
-import { startNewGame, getConversation } from "../api";
+import { startNewGame, getConversation, getTokenBalance, claimWelcomeBonus, claimDailyReward } from "../api";
 
 export class HomeScene extends Phaser.Scene {
   constructor() {
@@ -29,6 +29,9 @@ export class HomeScene extends Phaser.Scene {
     this.startTime = 0;
     this.guessCount = 0;
     this.nftCount = 0;
+    this.tokenBalanceElement = null;
+    this.currentBalance = 0;
+    this.playerAccountId = null;
   }
 
   init(data) {
@@ -41,13 +44,130 @@ export class HomeScene extends Phaser.Scene {
     this.account = data ? data.account : null;
     this.difficulty = data ? data.difficulty || "Easy" : "Easy";
   }
+  createTokenBalanceUI() {
+    // Create DOM element for token balance overlay
+    this.tokenBalanceElement = document.createElement('div');
+    this.tokenBalanceElement.style.cssText = `
+        position: fixed;
+        top: 20px;
+        left: 20px;
+        background: rgba(0, 0, 0, 0.9);
+        border: 2px solid #fbbf24;
+        border-radius: 15px;
+        padding: 15px;
+        color: white;
+        font-size: 16px;
+        font-weight: bold;
+        z-index: 1000;
+        min-width: 200px;
+        font-family: Arial, sans-serif;
+        backdrop-filter: blur(10px);
+    `;
+    
+    this.tokenBalanceElement.innerHTML = `
+        <div style="display: flex; align-items: center; margin-bottom: 10px;">
+            <span style="margin-right: 10px;">💰</span>
+            <span id="balance-text" style="color: #fbbf24;">Loading...</span>
+            <button id="refresh-btn" style="margin-left: 10px; background: none; border: none; color: #9ca3af; cursor: pointer; font-size: 14px;" title="Refresh balance">🔄</button>
+        </div>
+        <div id="chest-buttons" style="display: flex; gap: 8px; flex-direction: column;"></div>
+    `;
+    
+    document.body.appendChild(this.tokenBalanceElement);
+    
+    // Add event listeners
+    document.getElementById('refresh-btn').onclick = () => this.updateTokenBalance();
+    
+    // Initial balance fetch
+    this.updateTokenBalance();
+}
+async updateTokenBalance() {
+    if (!this.account) return;
+    
+    try {
+        const result = await getTokenBalance(this.account);
+        if (result && result.status === 'success') {
+            this.currentBalance = result.balance;
+            document.getElementById('balance-text').textContent = `${this.currentBalance.toLocaleString()} RN`;
+            this.updateChestButtons();
+        }
+    } catch (error) {
+        console.error('Error fetching token balance:', error);
+        document.getElementById('balance-text').textContent = 'Error loading balance';
+    }
+}
+updateChestButtons() {
+    const chestContainer = document.getElementById('chest-buttons');
+    if (!chestContainer) return;
+    
+    // Check eligibility (simplified)
+    const lastWelcome = localStorage.getItem(`welcome_${this.account}`);
+    const lastDaily = localStorage.getItem(`daily_${this.account}`);
+    const now = Date.now();
+    
+    const showWelcome = !lastWelcome;
+    const showDaily = !lastDaily || (now - parseInt(lastDaily) > 24 * 60 * 60 * 1000);
+    
+    chestContainer.innerHTML = '';
+    
+    if (showWelcome) {
+        const welcomeBtn = document.createElement('button');
+        welcomeBtn.innerHTML = '🎁 Welcome Bonus (250 RN)';
+        welcomeBtn.style.cssText = `
+            background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+            border: none; color: white; padding: 8px 12px; border-radius: 8px;
+            font-size: 12px; cursor: pointer; font-weight: bold;
+        `;
+        welcomeBtn.onclick = () => this.claimWelcomeBonus();
+        chestContainer.appendChild(welcomeBtn);
+    }
+    
+    if (showDaily) {
+        const dailyBtn = document.createElement('button');
+        dailyBtn.innerHTML = '📅 Daily Reward (50-200 RN)';
+        dailyBtn.style.cssText = `
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            border: none; color: white; padding: 8px 12px; border-radius: 8px;
+            font-size: 12px; cursor: pointer; font-weight: bold;
+        `;
+        dailyBtn.onclick = () => this.claimDailyReward();
+        chestContainer.appendChild(dailyBtn);
+    }
+}
+async claimWelcomeBonus() {
+    try {
+        const result = await claimWelcomeBonus(this.account);
+        if (result && result.status === 'success') {
+            alert(`Welcome bonus scheduled! You'll receive ${result.amount} Rune tokens in 1 minute.`);
+            localStorage.setItem(`welcome_${this.account}`, Date.now().toString());
+            this.updateChestButtons();
+            setTimeout(() => this.updateTokenBalance(), 2000);
+        }
+    } catch (error) {
+        alert('Welcome bonus already claimed or error occurred.');
+    }
+}
+
+async claimDailyReward() {
+    try {
+        const result = await claimDailyReward(this.account);
+        if (result && result.status === 'success') {
+            alert(`Daily reward scheduled! You'll receive ${result.amount} Rune tokens in 5 minutes.`);
+            localStorage.setItem(`daily_${this.account}`, Date.now().toString());
+            this.updateChestButtons();
+            setTimeout(() => this.updateTokenBalance(), 2000);
+        }
+    } catch (error) {
+        alert('Daily reward already claimed or cooldown active.');
+    }
+}
 
   async create() {
     this.startTime = this.time.now;
     // Create loading UI matching LoadingScene style
     const width = this.cameras.main.width;
     const height = this.cameras.main.height;
-
+    this.createTokenBalanceUI();
     // Add background overlay
     const overlay = this.add.rectangle(0, 0, width, height, 0x000000, 0.9).setOrigin(0).setDepth(200);
 
@@ -1139,4 +1259,13 @@ export class HomeScene extends Phaser.Scene {
       });
     });
   }
+  shutdown() {
+    // Remove token balance UI
+    if (this.tokenBalanceElement && this.tokenBalanceElement.parentNode) {
+        this.tokenBalanceElement.parentNode.removeChild(this.tokenBalanceElement);
+    }
+    
+    // ... your existing shutdown code ...
+  }
+
 }

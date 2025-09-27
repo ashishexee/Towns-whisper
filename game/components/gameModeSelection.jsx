@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ethers } from 'ethers';
+// Add this import with your other imports
+import TokenBalance from './TokenBalance';
 
 // SVG Icons
 const SinglePlayerIcon = () => (
@@ -74,12 +76,19 @@ const GameModeSelection = ({ onPlaySingle, onCreateRoom, onJoinRoom, username, w
 
     return (
         <div className="h-screen flex flex-col justify-center items-center text-center px-4 bg-gray-900/80 text-white relative">
+            {/* Rune Token Balance Overlay - Top Left */}
+            <TokenBalance 
+                accountId={walletAddress} 
+                showChests={true} 
+                position="top-left"
+            />
+
             {/* Top Bar with Balance and Username */}
-            <div className="absolute top-0 left-0 right-0 flex justify-between items-center p-6 bg-black/30 backdrop-blur-sm border-b border-teal-400/20">
-                {/* Balance - Top Left */}
+            <div className="absolute top-0 left-0 right-0 flex justify-between items-center p-6 bg-black/30 backdrop-blur-sm border-b border-teal-400/20" style={{ paddingLeft: '280px' }}>
+                {/* Balance - Top Left (moved right to avoid overlap) */}
                 <div className="flex items-center gap-2">
                     <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                    <span className="text-sm text-gray-400">Balance:</span>
+                    <span className="text-sm text-gray-400">ETH Balance:</span>
                     <span className="font-bold text-teal-300">
                         {isLoadingBalance ? (
                             <span className="animate-pulse">Loading...</span>
