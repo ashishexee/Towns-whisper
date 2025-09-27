@@ -1,18 +1,25 @@
 import Phaser from "phaser";
+
 export class LoadingScene extends Phaser.Scene {
   constructor() {
     super({ key: "LoadingScene" });
     this.account = null;
-    this.suiClient = null;
     this.dataToPass = {};
   }
 
   init(data) {
     this.nextScene = (data && data.nextScene) ? data.nextScene : 'VideoScene';
-    this.playerGender = (data && data.playerGender) ? data.playerGender : null;
+    this.playerGender = (data && data.playerGender) ? data.playerGender : 'Male';
     this.account = data ? data.account : null;
-    this.suiClient = data ? data.suiClient : null;
+    this.difficulty = data ? data.difficulty : 'Easy';
     this.dataToPass = data;
+    
+    console.log("LoadingScene initialized with:", {
+      nextScene: this.nextScene,
+      playerGender: this.playerGender,
+      account: this.account,
+      difficulty: this.difficulty
+    });
   }
 
   preload() {
@@ -123,12 +130,15 @@ export class LoadingScene extends Phaser.Scene {
       percentText.destroy();
       assetText.destroy();
       loadingText.setText('Loading Complete!');
-      this.scene.start(this.dataToPass.nextScene, this.dataToPass);
+      this.cameras.main.fadeOut(500, 0, 0, 0);
+      this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
+        this.scene.start(this.nextScene, this.dataToPass);
+      });
     });
   }
 
   create() {
-      const framePadding = 20;
+    const framePadding = 20;
     const frameWidth = this.cameras.main.width - framePadding * 2;
     const frameHeight = this.cameras.main.height - framePadding * 2;
     const cornerRadius = 30;
@@ -142,8 +152,6 @@ export class LoadingScene extends Phaser.Scene {
     frame.lineStyle(10, 0xd4af37, 1);
     frame.strokeRoundedRect(framePadding, framePadding, frameWidth, frameHeight, cornerRadius);
     frame.setDepth(100);
-    const width = this.cameras.main.width;
-    const height = this.cameras.main.height;
 
     this.time.delayedCall(500, () => {
       this.cameras.main.fadeOut(500, 0, 0, 0);
@@ -151,7 +159,7 @@ export class LoadingScene extends Phaser.Scene {
          const payload = { 
            playerGender: this.playerGender,
            account: this.account,
-           suiClient: this.suiClient
+           difficulty: this.difficulty
          };
         this.scene.start(this.nextScene, payload);
       });
