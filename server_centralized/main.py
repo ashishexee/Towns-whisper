@@ -10,9 +10,13 @@ import traceback
 import sys
 from dotenv import load_dotenv
 
+# --- MODIFIED IMPORTS ---
 from schemas import *
 from game_logic.engine import GameEngine
 from game_logic.state_manager import GameState
+# Import our new Hedera service function
+from hedera_service import schedule_rune_coin_reward
+# -------------------------
 
 # Load environment variables from a .env file if it exists
 load_dotenv()
@@ -49,7 +53,6 @@ async def startup_event():
 async def create_new_game(request: NewGameRequest):
     game_id = str(uuid.uuid4())
     try:
-        # num_villagers is no longer needed as the engine uses the full roster
         game_state = game_engine.start_new_game(
             game_id=game_id,
             num_inaccessible_locations=request.num_inaccessible_locations,
@@ -72,7 +75,6 @@ async def create_new_game(request: NewGameRequest):
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Failed to generate new game: {e}")
 
-# ... (the rest of the endpoints remain the same) ...
 @app.post("/game/{game_id}/interact", response_model=InteractResponse)
 async def interact(game_id: str, request: InteractRequest):
     if game_id not in active_games:
@@ -86,7 +88,6 @@ async def interact(game_id: str, request: InteractRequest):
             raise HTTPException(status_code=400, detail="Invalid villager ID.")
             
         villager_name = game_state.villagers[villager_index]["name"]
-        # FIX: Add a check to ensure msg.get('content') is not None before calling .lower()
         frustration = {"friends": len([
             msg for msg in game_state.full_npc_memory.get(villager_name, [])
             if msg.get("content") and "friend" in msg.get("content").lower()
@@ -96,7 +97,7 @@ async def interact(game_id: str, request: InteractRequest):
         dialogue_data = game_engine.process_interaction_turn(game_state, villager_name, player_input, frustration)
         
         if not dialogue_data:
-             raise HTTPException(status_code=500, detail="LLM failed to generate valid dialogue.")
+                raise HTTPException(status_code=500, detail="LLM failed to generate valid dialogue.")
 
         return InteractResponse(
             villager_id=request.villager_id,
@@ -135,3 +136,27 @@ async def guess(game_id: str, request: GuessRequest):
         is_correct=is_correct,
         is_true_ending=is_true_ending
     )
+
+# --- NEW ENDPOINT FOR SCHEDULING REWARDS ---
+@app.post("/chest/open", response_model=OpenChestResponse)
+async def open_chest(request: OpenChestRequest):
+    """
+    Handles the player opening a chest. Schedules a Rune Coin reward on Hedera.
+    """
+    print(f"Received request to open chest for player: {request.player_account_id}")
+    
+    # Call our Hedera service function
+    schedule_id = schedule_rune_coin_reward(player_account_id=request.player_account_id)
+    
+    if schedule_id:
+        return OpenChestResponse(
+            status="success",
+            message=f"Reward successfully scheduled! You'll receive it in about 30 minutes.",
+            schedule_id=schedule_id
+        )
+    else:
+        # If the function returned None, it means an error occurred.
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to schedule the transaction on the Hedera network. Please check the server logs."
+        )

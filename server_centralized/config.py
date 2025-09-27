@@ -1,6 +1,22 @@
 # config.py
 # This file contains the static, base data for the game world.
 # It defines the characters that the LLM can use to build a mystery.
+# config.py
+import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
+
+# --- HEDERA CONFIGURATION ---
+# Securely load your account ID and private key from the .env file
+HEDERA_ACCOUNT_ID = os.getenv("HEDERA_ACCOUNT_ID")
+HEDERA_PRIVATE_KEY = os.getenv("HEDERA_PRIVATE_KEY")
+RUNE_COIN_TOKEN_ID = "0.0.6913517" # Your Rune Coin Token ID
+
+# --- GAME WORLD DATA ---
+# This file contains the static, base data for the game world.
+# It defines the characters that the LLM can use to build a mystery.
 
 VILLAGER_ROSTER = [
     {
