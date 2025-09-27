@@ -16,13 +16,33 @@ export class DialogueScene extends Phaser.Scene {
     }
 
     init(data) {
-        this.conversationData = data.conversationData;
-        this.villagerSpriteKey = data.villagerSpriteKey;
-        this.newGameData = data.newGameData;
+    console.log("DialogueScene init called with data:", data);
+    this.conversationData = data.conversationData;
+    this.villagerSpriteKey = data.villagerSpriteKey;
+    this.newGameData = data.newGameData;
+    
+    // Add validation
+    if (!this.conversationData) {
+        console.error("No conversation data provided to DialogueScene!");
+        return;
     }
+    
+    if (!this.conversationData.npc_dialogue) {
+        console.error("No npc_dialogue in conversation data:", this.conversationData);
+        return;
+    }
+}
 
     create() {
-
+        console.log("DialogueScene create - conversationData:", this.conversationData); // Add this line
+        
+        if (!this.conversationData) {
+            console.error("No conversation data available!");
+            this.scene.stop();
+            this.scene.resume('HomeScene');
+            return;
+        }
+        
         this.initTTS();
         const framePadding = 20;
         const frameWidth = this.cameras.main.width - framePadding * 2;
@@ -64,11 +84,17 @@ export class DialogueScene extends Phaser.Scene {
             fontStyle: 'italic'
         }).setOrigin(0.5).setInteractive({ useHandCursor: true });
 
-        closeButton.on('pointerdown', () => {
-            this.stopSpeaking();
-            this.scene.stop();
-            this.scene.resume('HomeScene');
-        });
+       closeButton.on('pointerdown', () => {
+    this.stopSpeaking();
+    this.scene.stop();
+    this.scene.resume('HomeScene');
+    
+    // Re-enable input in HomeScene
+    const homeScene = this.scene.get('HomeScene');
+    if (homeScene && homeScene.input && homeScene.input.keyboard) {
+        homeScene.input.keyboard.enabled = true;
+    }
+});
 
         // --- Entry Animation ---
         // Fade in the entire scene for a smooth transition

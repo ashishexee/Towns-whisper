@@ -56,7 +56,7 @@ async function getConversation(villagerId, playerMessage) {
       },
       body: JSON.stringify({
         villager_id: villagerId,
-        player_message: playerMessage,
+        player_prompt: playerMessage, // CHANGED: was player_message
       }),
     });
     console.log(response);
