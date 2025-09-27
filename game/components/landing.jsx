@@ -8,7 +8,7 @@ const Hero = ({ onConnectClick }) => {
       <div className="absolute inset-0 bg-black/20"></div>
       <div className="relative z-10">
         <h1 className="text-5xl md:text-7xl font-bold text-white font-cinzel tracking-wider" style={{ textShadow: '0 0 20px rgba(100, 255, 218, 0.6)' }}>
-          "ECHOES OF THE VILLAGE"
+          "TOWNS WHISPER"
         </h1>
         <p className="mt-4 text-lg md:text-xl text-teal-200 font-merriweather">
           FIND YOUR LOST FRIENDS, UNCOVER THE TRUTH

@@ -105,7 +105,7 @@ export class MenuScene extends Phaser.Scene {
       );
 
     this.add
-      .text(width / 2, height / 2 - 160, "Echoes of the Village", {
+      .text(width / 2, height / 2 - 160, "Towns Whisper", {
         fontFamily: "Georgia, serif",
         fontSize: "56px",
         color: "#ffffff",

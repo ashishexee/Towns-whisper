@@ -1,7 +1,7 @@
 {
   "name": "bridge_server",
   "version": "1.0.0",
-  "description": "A service to bridge the Python backend of Echoes of the Village to the 0G Compute SDK.",
+  "description": "A service to bridge the Python backend of Towns Whisper to the 0G Compute SDK.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"

@@ -28,7 +28,7 @@ const ChallengeScreen = ({ onAccept, onDecline }) => {
   const handleAccept = () => {
     if (isStaking) {
       onAccept({
-        difficulty: `Custom (${time} min)`,
+        difficulty: 'Medium', // Always pass Medium for staking mode
         isStaking: true,
         stakeAmount: `${stakeAmount} ETH`,
         rewardAmount: `${rewardAmount} ETH`,
@@ -42,6 +42,33 @@ const ChallengeScreen = ({ onAccept, onDecline }) => {
         timeLimit: null, // No time limit for non-staked games
       });
     }
+  };
+
+  const handleAcceptChallenge = (challengeConfig) => {
+    // In a real scenario, you would trigger a smart contract interaction here
+    // if challengeConfig.isStaking is true.
+    if (challengeConfig.isStaking) {
+      console.log(`Staking ${challengeConfig.stakeAmount} for a ${challengeConfig.difficulty} challenge.`);
+      // This is a placeholder. The actual transaction would need to resolve
+      // before the game starts.
+      alert(`Staking ${challengeConfig.stakeAmount} is a feature in development. Proceeding without an on-chain transaction for now.`);
+    }
+
+    setGameConfig({
+      difficulty: challengeConfig.difficulty, // This will now be 'Medium' for staking mode
+      isStaking: challengeConfig.isStaking,
+      stakeAmount: challengeConfig.stakeAmount,
+      timeLimit: challengeConfig.timeLimit,
+      account: walletAddress,
+      playerGender: 'Male' // Still a placeholder
+    });
+    setCurrentView('game');
+    
+    console.log("Game config set:", {
+      difficulty: challengeConfig.difficulty,
+      account: walletAddress,
+      isStaking: challengeConfig.isStaking
+    });
   };
 
   return (
