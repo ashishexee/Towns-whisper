@@ -18,6 +18,7 @@ class NewGameResponse(BaseModel):
 class InteractRequest(BaseModel):
     villager_id: str
     player_prompt: Optional[str] = None
+    player_id: Optional[str] = None  # New field for multiplayer
 
 class InteractResponse(BaseModel):
     villager_id: str
@@ -27,11 +28,13 @@ class InteractResponse(BaseModel):
 
 class GuessRequest(BaseModel):
     location_name: str
+    player_id: Optional[str] = None  # New field for multiplayer
 
 class GuessResponse(BaseModel):
     is_correct: bool
     is_true_ending: bool
     message: str
+    story: Optional[str] = None
 
 class OpenChestRequest(BaseModel):
     """The request from the game client when a player opens a chest."""

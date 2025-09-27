@@ -4,7 +4,7 @@ import PhaserGame from './components/phaserGame';
 import Hero from './components/landing';
 import IntroductionPanel from './components/introductionPanel';
 import CharacterIntro from './components/characterIntro';
-import GameModeSelectionCard from './components/gameplayMechanics'; // Changed this line
+import GameModeSelectionCard from './components/gameplayMechanics';
 import Conversation from './components/conversation';
 import GameModeSelection from './components/gameModeSelection'; 
 import ChallengeScreen from './components/challengeScreen';
@@ -14,7 +14,7 @@ import RoomLobby from './components/RoomLobby';
 import { MultiplayerScene } from './scenes/MultiplayerScene';
 
 function App() {
-  const [currentView, setCurrentView] = useState('landing'); // 'landing', 'gameMode', 'challenge', 'game'
+  const [currentView, setCurrentView] = useState('landing');
   const [gameConfig, setGameConfig] = useState(null);
   const [showConversation, setShowConversation] = useState(false);
   const [hasConversationTriggered, setHasConversationTriggered] = useState(false);
@@ -29,9 +29,9 @@ function App() {
     { speaker: 'You', text: "Ugh... Where am I? My head... what happened?", portrait: '/assets/character_portraits/hemlock.png' },
     { speaker: 'Villager', text: "You were in an accident. I found you unconscious near a broken car.", portrait: '/assets/character_portraits/elara.png' },
     { speaker: 'You', text: "My friends! Did you see them? Were they with me?", portrait: '/assets/character_portraits/hemlock.png' },
-    { speaker: 'Villager', text: "I’m sorry… I didn’t see anyone else. But perhaps they are still in the village.", portrait: '/assets/character_portraits/elara.png' },
+    { speaker: 'Villager', text: "I'm sorry… I didn't see anyone else. But perhaps they are still in the village.", portrait: '/assets/character_portraits/elara.png' },
     { speaker: 'You', text: "Then I have to find them. Please, can you help me?", portrait: '/assets/character_portraits/hemlock.png' },
-    { speaker: 'Villager', text: "I will guide you. Search the village — maybe you’ll find answers there.", portrait: '/assets/character_portraits/elara.png' },
+    { speaker: 'Villager', text: "I will guide you. Search the village — maybe you'll find answers there.", portrait: '/assets/character_portraits/elara.png' },
   ];
 
   const handleConnectWallet = async () => {
@@ -45,23 +45,19 @@ function App() {
       const signer = await provider.getSigner();
       const address = await signer.getAddress();
       
-      // Initialize user registry service
       const registryService = new UserRegistryService(provider, signer);
       setUserRegistryService(registryService);
       
-      // Check if user is already registered
       const isRegistered = await registryService.isUserRegistered(address);
       
       setWalletAddress(address);
       
       if (isRegistered) {
-        // Get user info and proceed to game mode
         const userInfo = await registryService.getUserInfo(address);
         setUsername(userInfo.username);
         setCurrentView('gameMode');
         console.log("Returning user:", userInfo.username);
       } else {
-        // Show registration screen
         setCurrentView('registration');
         console.log("New user, showing registration");
       }
@@ -83,44 +79,64 @@ function App() {
   };
 
   const handleRegistrationCancel = () => {
-    // Reset wallet connection
     setWalletAddress(null);
     setUserRegistryService(null);
     setCurrentView('landing');
   };
 
   const handlePlaySingle = () => {
-    setCurrentView('challenge'); // Show challenge screen
+    setCurrentView('challenge');
   };
 
   const handleCreateRoom = async () => {
+    // Close any existing lobby first
+    if (showLobby) {
+      setShowLobby(false);
+      await new Promise(resolve => setTimeout(resolve, 100)); // Small delay to ensure cleanup
+    }
+    
     try {
+      console.log('Creating room...');
       const response = await fetch('http://127.0.0.1:8000/create_room', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         }
       });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
       const data = await response.json();
+      console.log('Room created:', data);
       setRoomId(data.room_id);
       setShowLobby(true);
     } catch (error) {
       console.error('Failed to create room:', error);
-      alert('Failed to create room. Please try again.');
+      alert(`Failed to create room: ${error.message}. Please ensure the server is running on port 8000.`);
     }
   };
 
-  const handleJoinRoom = () => {
-    alert("Join Room feature coming soon!");
+  const handleJoinRoom = async () => {
+    // Close any existing lobby first
+    if (showLobby) {
+      setShowLobby(false);
+      await new Promise(resolve => setTimeout(resolve, 100)); // Small delay to ensure cleanup
+    }
+    
+    const roomIdInput = prompt("Enter Room ID:");
+    if (roomIdInput && roomIdInput.trim()) {
+      setRoomId(roomIdInput.trim());
+      setShowLobby(true);
+    } else if (roomIdInput !== null) {
+      alert("Please enter a valid Room ID.");
+    }
   };
 
   const handleAcceptChallenge = (challengeConfig) => {
-    // In a real scenario, you would trigger a smart contract interaction here
-    // if challengeConfig.isStaking is true.
     if (challengeConfig.isStaking) {
       console.log(`Staking ${challengeConfig.stakeAmount} for a ${challengeConfig.difficulty} challenge.`);
-      // This is a placeholder. The actual transaction would need to resolve
-      // before the game starts.
       alert(`Staking ${challengeConfig.stakeAmount} is a feature in development. Proceeding without an on-chain transaction for now.`);
     }
 
@@ -130,7 +146,7 @@ function App() {
       stakeAmount: challengeConfig.stakeAmount,
       timeLimit: challengeConfig.timeLimit,
       account: walletAddress,
-      playerGender: 'Male' // Still a placeholder
+      playerGender: 'Male'
     });
     setCurrentView('game');
     
@@ -144,38 +160,37 @@ function App() {
     setCurrentView('gameMode');
   };
 
-  const handleStartGame = () => {
+  const handleStartGame = (gameData) => {
+    console.log('Starting multiplayer game with data:', gameData);
+    
     setGameConfig({
-      ...gameConfig,
+      difficulty: 'medium',
       isMultiplayer: true,
       roomId: roomId,
-      playerId: walletAddress
+      playerId: walletAddress,
+      gameData: gameData
     });
+    
     setCurrentView('game');
     setShowLobby(false);
   };
 
-  // This effect now triggers the conversation on user scroll, but only once.
   useEffect(() => {
     const handleScroll = () => {
-      // Check if user has scrolled, and if the conversation has NOT been triggered before.
       if (window.scrollY > 100 && !hasConversationTriggered) {
         setShowConversation(true);
-        // Set the triggered flag to true to prevent this from running again.
         setHasConversationTriggered(true);
       }
     };
 
-    // Add the scroll event listener only if the conversation hasn't been triggered yet.
     if (!hasConversationTriggered) {
       window.addEventListener('scroll', handleScroll);
     }
 
-    // Cleanup: remove the event listener when the component unmounts
     return () => {
       window.removeEventListener('scroll', handleScroll);
     };
-  }, [hasConversationTriggered]); // Dependency array now correctly tracks the trigger state.
+  }, [hasConversationTriggered]);
 
   if (currentView === 'game') {
     return <PhaserGame gameConfig={gameConfig} />;
@@ -226,31 +241,39 @@ function App() {
             />
           )}
 
-          {/* The landing page content is now part of the main view logic */}
           {currentView === 'landing' && (
             <>
               <IntroductionPanel />
               <CharacterIntro />
-              <GameModeSelectionCard onPlayClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} />
+              <GameModeSelectionCard 
+                onPlayClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+                onPlaySingle={handlePlaySingle}
+                onCreateRoom={handleCreateRoom}
+                onJoinRoom={handleJoinRoom}
+                username={username}
+                walletAddress={walletAddress}
+                userRegistryService={userRegistryService}
+              />
             </>
           )}
-            {showConversation && (
-              <Conversation
-                dialogues={dialogues}
-                onComplete={() => {
-                  // This will now correctly hide the conversation without it re-triggering.
-                  setShowConversation(false);
-                }}
-              />
-            )}
+          
+          {showConversation && (
+            <Conversation
+              dialogues={dialogues}
+              onComplete={() => {
+                setShowConversation(false);
+              }}
+            />
+          )}
 
-            {showLobby && (
-                <RoomLobby
-                    roomId={roomId}
-                    onStart={handleStartGame}
-                    onClose={() => setShowLobby(false)}
-                />
-            )}
+          {showLobby && (
+            <RoomLobby 
+              roomId={roomId} 
+              onStart={handleStartGame}
+              onClose={() => setShowLobby(false)}
+              playerId={walletAddress}
+            />
+          )}
         </main>
       </div>
     </div>

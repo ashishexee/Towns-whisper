@@ -12,11 +12,11 @@ async function startNewGame(difficulty) {
     const response = await fetch(`${API_BASE_URL}/game/new`, {
       method: 'POST',
       headers: {
-      'Content-Type': 'application/json',
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-      difficulty: difficulty,
-      num_inaccessible_locations: 5,
+        difficulty: difficulty,
+        num_inaccessible_locations: 5
       }),
     });
 
@@ -43,29 +43,46 @@ async function startNewGame(difficulty) {
  * @param {string} playerMessage The message or suggestion chosen by the player.
  * @returns {Promise<object|null>} The conversation data, or null if it fails.
  */
-async function getConversation(villagerId, playerMessage) {
+async function getConversation(villagerId, playerMessage, playerId = null) {
   if (!currentGameId) {
     console.error("Cannot get conversation: no active game ID.");
     return null;
   }
+  
   try {
+    const requestBody = {
+      villager_id: villagerId,
+      player_prompt: playerMessage,
+    };
+    
+    if (playerId) {
+      requestBody.player_id = playerId;
+    }
+    
+    console.log('Sending conversation request:', requestBody);
+    
     const response = await fetch(`${API_BASE_URL}/game/${currentGameId}/interact`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        villager_id: villagerId,
-        player_message: playerMessage,
-      }),
+      body: JSON.stringify(requestBody),
     });
-    console.log(response);
     
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
 
-    return await response.json();
+    const data = await response.json();
+    console.log('Received conversation response:', data);
+    
+    // Validate the response structure
+    if (!data.npc_dialogue) {
+      console.error('Invalid response structure - missing npc_dialogue:', data);
+      return null;
+    }
+    
+    return data;
   } catch (error) {
     console.error("Error getting conversation:", error);
     return null;
@@ -77,21 +94,27 @@ async function getConversation(villagerId, playerMessage) {
  * @param {string} location The name of the location chosen by the player.
  * @returns {Promise<object|null>} The server's response, or null if it fails.
  */
-async function chooseLocation(location) {
+async function chooseLocation(location, playerId = null) {
   if (!currentGameId) {
     console.error("Cannot choose location: no active game ID.");
     return null;
   }
 
   try {
+    const requestBody = {
+      location_name: location,
+    };
+    
+    if (playerId) {
+      requestBody.player_id = playerId;
+    }
+    
     const response = await fetch(`${API_BASE_URL}/game/${currentGameId}/guess`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        location_name: location,
-      }),
+      body: JSON.stringify(requestBody),
     });
 
     if (!response.ok) {
@@ -108,22 +131,26 @@ async function chooseLocation(location) {
 }
 
 /**
- * Pings the server to wake it up if it's on a free hosting service.
+ * Sets the current game ID.
+ * @param {string} gameId The game ID to set as current.
  */
- async function pingServer() {
+function setCurrentGameId(gameId) {
+  currentGameId = gameId;
+}
+
+/**
+ * Pings the server to check if it's reachable.
+ * @returns {Promise<boolean>} True if the server is reachable, false otherwise.
+ */
+async function pingServer() {
   try {
-    console.log("Pinging server to wake it up...");
-    const response = await fetch(`${API_BASE_URL}/ping/`);
-    if (!response.ok) {
-      throw new Error(`Ping failed with status: ${response.status}`);
-    }
-    const data =  await response.json();
-    console.log("Server responded to ping:", data.message);
+    const response = await fetch(`${API_BASE_URL}/`);
+    return response.ok;
   } catch (error) {
-    // This is not a critical error, so we just warn about it.
-    console.warn("Server ping failed (this is not critical):", error);
+    console.error("Error pinging server:", error);
+    return false;
   }
 }
 
 // Export the functions to be used in your game scenes
-export { startNewGame, getConversation, chooseLocation, pingServer };
+export { startNewGame, getConversation, chooseLocation, setCurrentGameId, pingServer };
