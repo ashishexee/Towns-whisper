@@ -1,0 +1,27 @@
+{
+  "name": "echoes-game-master-agent",
+  "version": "1.0.0",
+  "description": "The Hedera AI Agent backend for Echoes of the Village.",
+  "main": "GameMasterAgent.js",
+  "type": "module",
+  "scripts": {
+    "start": "node GameMasterAgent.js"
+  },
+  "keywords": [
+    "hedera",
+    "ai",
+    "agent",
+    "game"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@hashgraph/hedera-agent-kit": "^0.3.1",
+    "@hashgraph/sdk": "^2.49.0",
+    "axios": "^1.7.2",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "node-fetch": "^3.3.2"
+  }
+}
+

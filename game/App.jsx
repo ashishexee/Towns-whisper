@@ -281,6 +281,7 @@ function App() {
             <ChallengeScreen
               onAccept={handleAcceptChallenge}
               onDecline={handleDeclineChallenge}
+              walletAddress={walletAddress}
             />
           )}
 

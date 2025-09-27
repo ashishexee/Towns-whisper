@@ -36,7 +36,7 @@ export class DialogueScene extends Phaser.Scene {
             return;
         }
     }
-
+    
     create() {
         console.log("DialogueScene create - conversationData:", this.conversationData);
         
@@ -351,3 +351,4 @@ export class DialogueScene extends Phaser.Scene {
         this.stopSpeaking();
     }
 }
+

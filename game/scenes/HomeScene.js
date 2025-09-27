@@ -1,5 +1,7 @@
 import Phaser from "phaser";
 import { startNewGame, getConversation, getTokenBalance, claimWelcomeBonus, claimDailyReward } from "../api";
+import { GAME_ITEMS_ABI, CONTRACT_ADDRESSES } from '../../contracts_eth/config.js';
+import { ethers } from 'ethers';
 
 export class HomeScene extends Phaser.Scene {
   constructor() {
@@ -1265,7 +1267,14 @@ async claimDailyReward() {
       }
     });
 
+    // Update interaction text visibility and content
     if (this.nearbyVillager) {
+      if (this.nearbyVillager.requiredItem && !this.playerInventory.has(this.nearbyVillager.requiredItem)) {
+        const itemName = this.nearbyVillager.requiredItem.replace(/_/g, ' ');
+        this.interactionText.setText(`Requires: ${itemName}`);
+      } else {
+        this.interactionText.setText("Press ENTER to talk");
+      }
       this.interactionText.setVisible(true);
       this.interactionText.setPosition(
         this.nearbyVillager.x,
@@ -1275,13 +1284,74 @@ async claimDailyReward() {
       this.interactionText.setVisible(false);
     }
 
+    // Handle interaction when ENTER is pressed
     if (Phaser.Input.Keyboard.JustDown(this.enterKey) && this.nearbyVillager) {
-      this.handleInteraction();
+      this.startConversation();
     }
   }
 
-  // --- New Methods for Minting and Inventory ---
+  // Rename and simplify the interaction method
+  startConversation() {
+    if (!this.nearbyVillager) return;
 
+    // If villager requires an item and player doesn't have it
+    if (this.nearbyVillager.requiredItem && !this.playerInventory.has(this.nearbyVillager.requiredItem)) {
+      this.scene.pause();
+      this.scene.launch('ItemLockScene', {
+        villager: this.nearbyVillager,
+        account: this.account,
+        gameData: this.gameData
+      });
+      return;
+    }
+
+    // Start conversation
+    console.log(`Starting conversation with villager: ${this.nearbyVillager.name}`);
+    
+    // Disable input during conversation setup
+    this.input.keyboard.enabled = false;
+    this.player.setVelocity(0, 0);
+    
+    getConversation(this.nearbyVillager.name, "I'd like to talk.")
+      .then(conversationData => {
+        console.log("Conversation data received:", conversationData);
+        
+        if (conversationData && conversationData.npc_dialogue) {
+          // Launch dialogue scene
+          this.scene.launch("DialogueScene", {
+            conversationData: conversationData,
+            villagerSpriteKey: this.nearbyVillager.texture.key,
+            newGameData: this.gameData
+          });
+          this.scene.pause();
+        } else {
+          console.error("Invalid conversation data:", conversationData);
+          this.showErrorMessage("Unable to start conversation. Please try again.");
+          this.input.keyboard.enabled = true;
+        }
+      })
+      .catch(error => {
+        console.error("Error getting conversation:", error);
+        this.showErrorMessage("Network error. Please try again.");
+        this.input.keyboard.enabled = true;
+      });
+  }
+
+  showErrorMessage(message) {
+    const errorText = this.add.text(
+      this.cameras.main.centerX, 
+      this.cameras.main.centerY, 
+      message, 
+      { fontSize: '24px', color: '#ff4444', backgroundColor: 'rgba(0,0,0,0.8)', padding: { x: 20, y: 10 } }
+    ).setOrigin(0.5).setDepth(200);
+    
+    this.time.delayedCall(2000, () => {
+      errorText.destroy();
+    });
+  }
+
+  // Remove the old handleInteraction method and keep the simplified logic
+  // ...existing code...
   unlockVillager(villagerName) {
     const villager = this.villagers
       .getChildren()
@@ -1329,6 +1399,12 @@ async claimDailyReward() {
       return;
     }
 
+    if (typeof window.ethereum === 'undefined') {
+        console.error("MetaMask or a compatible wallet is not installed.");
+        this.showErrorMessage("Please install a wallet like MetaMask.");
+        return;
+    }
+
     this.input.keyboard.enabled = false;
     const mintingStatusText = this.add
       .text(
@@ -1346,12 +1422,39 @@ async claimDailyReward() {
       .setDepth(101);
 
     try {
-      // HERE the integration of an NFT minting function on an EVM contract is to be done.
-      console.log(`Simulating mint for: ${itemName}`);
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+        const provider = new ethers.BrowserProvider(window.ethereum);
+        const signer = await provider.getSigner();
+        
+        // Use the imported address and ABI
+        const gameItemsContract = new ethers.Contract(CONTRACT_ADDRESSES.gameItems, GAME_ITEMS_ABI, signer);
 
-      console.log("Mint successful!");
-      mintingStatusText.setText(`${itemName} minted successfully!`);
+        const itemNameFormatted = itemName.replace(/_/g, ' ');
+        // It's good practice to host metadata for your NFTs
+        const tokenURI = `https://your-metadata-server.com/items/${itemName.toLowerCase()}.json`; 
+        const description = `A trusty ${itemNameFormatted} for your adventures.`;
+
+        mintingStatusText.setText("Please confirm in wallet...");
+
+        const tx = await gameItemsContract.mintItemTo(
+            this.account,
+            tokenURI,
+            itemNameFormatted,
+            description
+        );
+
+        mintingStatusText.setText("Transaction sent. Waiting for confirmation...");
+        const receipt = await tx.wait(); // Wait for the transaction to be mined
+
+        console.log("Mint successful! Transaction:", receipt.hash);
+        mintingStatusText.setText(`${itemNameFormatted} minted successfully!`);
+        
+        // This is an "optimistic" update. The next step is to verify on-chain.
+        this.playerInventory.add(itemName);
+        await this.updateInventory();
+        
+        if (this.activeMintZone && this.activeMintZone.itemName === itemName) {
+            this.mintText.setText(`You already own the ${itemName.replace(/_/g, ' ')}`);
+        }
 
       this.playerInventory.add(itemName);
       await this.updateInventory();
@@ -1362,16 +1465,22 @@ async claimDailyReward() {
         );
       }
     } catch (error) {
-      console.error("Minting failed:", error);
-      mintingStatusText.setText(`Minting failed. See console for details.`);
+        console.error("Minting failed:", error);
+        let errorMessage = "Minting failed. See console.";
+        if (error.code === 'ACTION_REJECTED') {
+            errorMessage = "Transaction rejected.";
+        } else if (error.reason) {
+            // Display contract revert reasons
+            errorMessage = `Minting failed: ${error.reason}`;
+        }
+        mintingStatusText.setText(errorMessage);
     } finally {
-      this.time.delayedCall(2000, () => {
-        mintingStatusText.destroy();
-        this.input.keyboard.enabled = true;
-      });
+        this.time.delayedCall(3000, () => {
+            mintingStatusText.destroy();
+            this.input.keyboard.enabled = true;
+        });
     }
   }
-
   async updateInventory() {
     if (!this.account) return;
 
@@ -1384,6 +1493,53 @@ async claimDailyReward() {
     } catch (error) {
       console.error("Failed to update inventory:", error);
     }
+  }
+
+  handleVillagerInteraction(villagerSprite) {
+    const villagerId = villagerSprite.getData("villagerId");
+    console.log(`Interacting with villager: ${villagerId}`);
+    
+    // Check if we have conversation data
+    getConversation(villagerId, "I'd like to talk.").then(conversationData => {
+      console.log("Raw conversation response:", conversationData); // Add this line
+      
+      if (conversationData && conversationData.npc_dialogue) {
+        console.log("Conversation data received:", conversationData);
+        
+        // Launch dialogue scene with the conversation data
+        this.scene.launch("DialogueScene", {
+          conversationData: conversationData,
+          villagerSpriteKey: villagerSprite.texture.key,
+          newGameData: this.newGameData
+        });
+        this.scene.pause();
+      } else {
+        console.error("Failed to get conversation data or missing npc_dialogue:", conversationData);
+        // Show a temporary message to the user
+        const errorText = this.add.text(
+          this.cameras.main.centerX, 
+          this.cameras.main.centerY, 
+          "Unable to start conversation. Please try again.", 
+          { fontSize: '24px', color: '#ff4444' }
+        ).setOrigin(0.5);
+        
+        this.time.delayedCall(2000, () => {
+          errorText.destroy();
+        });
+      }
+    }).catch(error => {
+      console.error("Error getting conversation:", error);
+      const errorText = this.add.text(
+        this.cameras.main.centerX, 
+        this.cameras.main.centerY, 
+        "Network error. Please try again.", 
+        { fontSize: '24px', color: '#ff4444' }
+      ).setOrigin(0.5);
+      
+      this.time.delayedCall(2000, () => {
+        errorText.destroy();
+      });
+    });
   }
   shutdown() {
     // Remove token balance UI
