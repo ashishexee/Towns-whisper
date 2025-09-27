@@ -19,6 +19,7 @@ class NewGameResponse(BaseModel):
 class InteractRequest(BaseModel):
     villager_id: str
     player_prompt: Optional[str] = None
+    player_id: Optional[str] = None  # New field for multiplayer
 
 class InteractResponse(BaseModel):
     villager_id: str
@@ -28,11 +29,13 @@ class InteractResponse(BaseModel):
 
 class GuessRequest(BaseModel):
     location_name: str
+    player_id: Optional[str] = None  # New field for multiplayer
 
 class GuessResponse(BaseModel):
     is_correct: bool
     is_true_ending: bool
     message: str
+    story: Optional[str] = None
 
 # Rune Token / Chest system schemas
 class OpenChestRequest(BaseModel):
