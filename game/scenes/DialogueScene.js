@@ -5,12 +5,11 @@ export class DialogueScene extends Phaser.Scene {
     constructor() {
         super({ key: "DialogueScene" });
         this.conversationData = null;
-        this.villagerSpriteKey = null;
+        this.villagrSpriteKey = null;
         this.newGameData = null;
         this.rightPanelContainer = null; 
         this.playerId = null;
         this.callingScene = null; // Track which scene called this
-
         this.voices = [];
         this._currentSpeechResolve = null;
         this._currentSpeechTimer = null;
