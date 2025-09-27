@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ethers } from 'ethers';
 
-const GameModeSelection = ({ onPlaySingle, onCreateRoom, onJoinRoom, username, walletAddress, userRegistryService }) => {
+const GameModeSelectionCard = ({ onPlaySingle, onCreateRoom, onJoinRoom, username, walletAddress, userRegistryService }) => {
   const [balance, setBalance] = useState('0.00');
   const [isLoadingBalance, setIsLoadingBalance] = useState(true);
 
@@ -136,4 +136,4 @@ const GameModeSelection = ({ onPlaySingle, onCreateRoom, onJoinRoom, username, w
   );
 };
 
-export default GameModeSelection;
+export default GameModeSelectionCard;
