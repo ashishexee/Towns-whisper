@@ -14,8 +14,6 @@ from dotenv import load_dotenv
 from schemas import *
 from game_logic.engine import GameEngine
 from game_logic.state_manager import GameState
-# Import our new Hedera service function
-from hedera_service import schedule_rune_coin_reward
 # -------------------------
 
 # Load environment variables from a .env file if it exists
