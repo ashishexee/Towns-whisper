@@ -2,14 +2,16 @@ import React, { useState, useRef, useEffect } from 'react';
 import { ethers } from 'ethers';
 import PhaserGame from './components/phaserGame';
 import Hero from './components/landing';
-import IntroductionPanel from './components/IntroductionPanel';
-import CharacterIntro from './components/CharacterIntro';
-import GameModeSelectionCard from './components/GameplayMechanics'; // Changed this line
-import Conversation from './components/Conversation';
+import IntroductionPanel from './components/introductionPanel';
+import CharacterIntro from './components/characterIntro';
+import GameModeSelectionCard from './components/gameplayMechanics'; // Changed this line
+import Conversation from './components/conversation';
 import GameModeSelection from './components/gameModeSelection'; 
 import ChallengeScreen from './components/challengeScreen';
 import UserRegistration from './components/UserRegistration';
 import { UserRegistryService } from './utils/userRegistry';
+import RoomLobby from './components/RoomLobby';
+import { MultiplayerScene } from './scenes/MultiplayerScene';
 
 function App() {
   const [currentView, setCurrentView] = useState('landing'); // 'landing', 'gameMode', 'challenge', 'game'
@@ -19,6 +21,8 @@ function App() {
   const [walletAddress, setWalletAddress] = useState(null);
   const [userRegistryService, setUserRegistryService] = useState(null);
   const [username, setUsername] = useState('');
+  const [roomId, setRoomId] = useState(null);
+  const [showLobby, setShowLobby] = useState(false);
   const videoRef = useRef(null);
 
   const dialogues = [
@@ -89,8 +93,21 @@ function App() {
     setCurrentView('challenge'); // Show challenge screen
   };
 
-  const handleCreateRoom = () => {
-    alert("Create Room feature coming soon!");
+  const handleCreateRoom = async () => {
+    try {
+      const response = await fetch('http://127.0.0.1:8000/create_room', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      const data = await response.json();
+      setRoomId(data.room_id);
+      setShowLobby(true);
+    } catch (error) {
+      console.error('Failed to create room:', error);
+      alert('Failed to create room. Please try again.');
+    }
   };
 
   const handleJoinRoom = () => {
@@ -125,6 +142,17 @@ function App() {
 
   const handleDeclineChallenge = () => {
     setCurrentView('gameMode');
+  };
+
+  const handleStartGame = () => {
+    setGameConfig({
+      ...gameConfig,
+      isMultiplayer: true,
+      roomId: roomId,
+      playerId: walletAddress
+    });
+    setCurrentView('game');
+    setShowLobby(false);
   };
 
   // This effect now triggers the conversation on user scroll, but only once.
@@ -214,6 +242,14 @@ function App() {
                   setShowConversation(false);
                 }}
               />
+            )}
+
+            {showLobby && (
+                <RoomLobby
+                    roomId={roomId}
+                    onStart={handleStartGame}
+                    onClose={() => setShowLobby(false)}
+                />
             )}
         </main>
       </div>

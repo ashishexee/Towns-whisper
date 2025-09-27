@@ -5,13 +5,15 @@ import { HomeScene } from "../scenes/HomeScene.js";
 import { DialogueScene } from "../scenes/DialogueScene.js";
 import { VideoScene } from "../scenes/VideoScene.js";
 import { UIScene } from "../scenes/UIScene.js";
-import { ItemLockScene } from "../scenes/ItemLockScene.js";
+import { ItemLockScene } from "../scenes/ItemlockScene.js";
 import { InventoryScene } from "../scenes/InventoryScene.js";
 import { EndScene } from "../scenes/EndScene.js";
+import { MultiplayerScene } from '../scenes/MultiplayerScene.js';
 
 const PhaserGame = ({ gameConfig }) => {
     const gameRef = useRef(null);
-
+    const { isMultiplayer, roomId, playerId } = gameConfig;
+    
     useEffect(() => {
         if (gameRef.current && gameConfig) {
             const config = {
@@ -31,7 +33,17 @@ const PhaserGame = ({ gameConfig }) => {
                         height: 1080
                     }
                 },
-                scene: [LoadingScene, HomeScene, DialogueScene, VideoScene, UIScene, ItemLockScene, InventoryScene, EndScene],
+                scene: [
+                    LoadingScene, 
+                    HomeScene, 
+                    DialogueScene, 
+                    VideoScene, 
+                    UIScene, 
+                    ItemLockScene, 
+                    InventoryScene, 
+                    EndScene,
+                    isMultiplayer ? MultiplayerScene : null
+                ].filter(Boolean),
                 physics: {
                     default: 'arcade',
                     arcade: {
@@ -55,7 +67,9 @@ const PhaserGame = ({ gameConfig }) => {
                 playerGender: 'Male', // Default or from gameConfig
                 account: gameConfig.account,
                 difficulty: gameConfig.difficulty,
-                nextScene: 'VideoScene'
+                nextScene: isMultiplayer ? 'MultiplayerScene' : 'VideoScene',
+                roomId,
+                playerId
             });
 
             return () => {

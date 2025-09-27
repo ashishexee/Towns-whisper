@@ -2,7 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import App from './App.jsx';
-import './app.css';
+import './App.css';
 
 // Find the root element in your index.html
 const rootElement = document.getElementById('root');

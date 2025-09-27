@@ -1,13 +1,14 @@
 # main.py
 # This script runs the FastAPI server, exposing the game engine through API endpoints.
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from typing import Dict
+from typing import Dict, List
 import uuid
 import os
 import traceback
 import sys
+import json
 
 from schemas import *
 from game_logic.engine import GameEngine
@@ -141,3 +142,114 @@ async def guess(game_id: str, request: GuessRequest):
         is_correct=is_correct,
         is_true_ending=is_true_ending
     )
+
+# Add these new classes and data structures
+class Player:
+    def __init__(self, id: str, name: str):
+        self.id = id
+        self.name = name
+        self.position = {"x": 400, "y": 300}
+        self.websocket = None
+
+class GameRoom:
+    def __init__(self, id: str):
+        self.id = id
+        self.players: Dict[str, Player] = {}
+        self.started = False
+
+    def add_player(self, player: Player) -> bool:
+        if len(self.players) >= 5:
+            return False
+        self.players[player.id] = player
+        return True
+
+    def remove_player(self, player_id: str):
+        self.players.pop(player_id, None)
+
+    def get_player_list(self):
+        return [{"id": p.id, "name": p.name} for p in self.players.values()]
+
+# Add room management
+rooms: Dict[str, GameRoom] = {}
+
+# Add new endpoints
+@app.post("/create_room")
+async def create_room():
+    room_id = str(uuid.uuid4())[:8]
+    rooms[room_id] = GameRoom(room_id)
+    return {"room_id": room_id}
+
+@app.get("/rooms/{room_id}")
+async def get_room(room_id: str):
+    if room_id not in rooms:
+        raise HTTPException(status_code=404, detail="Room not found")
+    room = rooms[room_id]
+    return {
+        "id": room.id,
+        "players": room.get_player_list(),
+        "started": room.started
+    }
+
+@app.websocket("/ws/{room_id}/{player_id}")
+async def websocket_endpoint(
+    websocket: WebSocket,
+    room_id: str,
+    player_id: str,
+    player_name: str = "Player"
+):
+    await websocket.accept()
+    
+    if room_id not in rooms:
+        await websocket.close(code=4000)
+        return
+        
+    room = rooms[room_id]
+    player = Player(player_id, player_name)
+    player.websocket = websocket
+    
+    if not room.add_player(player):
+        await websocket.close(code=4001)
+        return
+        
+    try:
+        # Broadcast player list to all players in room
+        player_list = room.get_player_list()
+        for p in room.players.values():
+            await p.websocket.send_json({
+                "type": "players_update",
+                "players": player_list
+            })
+            
+        while True:
+            data = await websocket.receive_json()
+            
+            if data["type"] == "start_game":
+                room.started = True
+                # Notify all players to start game
+                for p in room.players.values():
+                    await p.websocket.send_json({"type": "game_started"})
+                    
+            elif data["type"] == "move":
+                player.position = {"x": data["x"], "y": data["y"]}
+                # Broadcast position to other players
+                for p in room.players.values():
+                    if p.id != player_id:
+                        await p.websocket.send_json({
+                            "type": "player_moved",
+                            "playerId": player_id,
+                            "x": data["x"],
+                            "y": data["y"]
+                        })
+                        
+    except WebSocketDisconnect:
+        room.remove_player(player_id)
+        if len(room.players) == 0:
+            rooms.pop(room_id, None)
+        else:
+            # Notify remaining players
+            for p in room.players.values():
+                await p.websocket.send_json({
+                    "type": "player_left",
+                    "playerId": player_id,
+                    "players": room.get_player_list()
+                })
