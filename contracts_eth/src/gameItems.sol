@@ -18,8 +18,8 @@ contract GameItems is ERC721URIStorage, AccessControl {
     event ItemMinted(address indexed to, uint256 indexed id, string name);
 
     constructor() ERC721("EchoesItem", "EITEM") {
-        _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        _setupRole(MINTER_ROLE, msg.sender);
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        _grantRole(MINTER_ROLE, msg.sender);
     }
 
     /// @notice Mint to arbitrary address. Only accounts with MINTER_ROLE can call.
@@ -45,8 +45,19 @@ contract GameItems is ERC721URIStorage, AccessControl {
         view
         returns (string memory, string memory, address, string memory)
     {
-        require(_exists(tokenId), "Nonexistent token");
         Item storage it = items[tokenId];
         return (it.name, it.description, ownerOf(tokenId), tokenURI(tokenId));
     }
+
+    // FIX: Override the supportsInterface function to resolve the conflict
+    // between ERC721URIStorage and AccessControl.
+    function supportsInterface(bytes4 interfaceId)
+        public
+        view
+        override(ERC721URIStorage, AccessControl)
+        returns (bool)
+    {
+        return super.supportsInterface(interfaceId);
+    }
 }
+
