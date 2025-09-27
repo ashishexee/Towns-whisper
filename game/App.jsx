@@ -13,6 +13,10 @@ import { UserRegistryService } from './utils/userRegistry';
 import RoomLobby from './components/RoomLobby';
 import { MultiplayerScene } from './scenes/MultiplayerScene';
 
+// --- 1. IMPORT THE NEW COMPONENT AND API FUNCTION ---
+import RewardChest from './components/RewardChest';
+import { openRewardChest } from './api';
+
 function App() {
   const [currentView, setCurrentView] = useState('landing');
   const [gameConfig, setGameConfig] = useState(null);
@@ -25,6 +29,9 @@ function App() {
   const [showLobby, setShowLobby] = useState(false);
   const videoRef = useRef(null);
 
+  // --- 2. ADD NEW STATE FOR THE REWARD CHEST POPUP ---
+  const [showRewardChest, setShowRewardChest] = useState(false);
+
   const dialogues = [
     { speaker: 'You', text: "Ugh... Where am I? My head... what happened?", portrait: '/assets/character_portraits/hemlock.png' },
     { speaker: 'Villager', text: "You were in an accident. I found you unconscious near a broken car.", portrait: '/assets/character_portraits/elara.png' },
@@ -33,6 +40,42 @@ function App() {
     { speaker: 'You', text: "Then I have to find them. Please, can you help me?", portrait: '/assets/character_portraits/hemlock.png' },
     { speaker: 'Villager', text: "I will guide you. Search the village — maybe you'll find answers there.", portrait: '/assets/character_portraits/elara.png' },
   ];
+
+  // --- 3. ADD USEEFFECT TO LISTEN FOR THE 'gameWon' EVENT ---
+  useEffect(() => {
+    const handleGameWon = () => {
+      console.log("React heard the 'gameWon' event from Phaser!");
+      setCurrentView('landing'); // Return to the main screen
+      setShowRewardChest(true); // Show the reward popup
+    };
+
+    window.addEventListener('gameWon', handleGameWon);
+
+    // Cleanup listener when the component unmounts
+    return () => {
+      window.removeEventListener('gameWon', handleGameWon);
+    };
+  }, []); // Empty dependency array means this runs once on mount
+
+  // --- 4. ADD THE HANDLER FUNCTION TO CLAIM THE REWARD ---
+  const handleClaimReward = async () => {
+    if (!walletAddress) {
+      alert("Wallet not connected!");
+      return;
+    }
+
+    console.log(`Claiming reward for wallet: ${walletAddress}`);
+    const result = await openRewardChest(walletAddress);
+
+    if (result && result.status === 'success') {
+      alert("Success! Your reward has been scheduled. Check your wallet in about 30 minutes.");
+      console.log("Scheduling successful, scheduleId:", result.schedule_id);
+    } else {
+      alert("There was an error scheduling your reward. Please try again.");
+      console.error("Failed to schedule reward:", result);
+    }
+    setShowRewardChest(false); // Close the popup regardless of outcome
+  };
 
   const handleConnectWallet = async () => {
     if (typeof window.ethereum === 'undefined') {
@@ -211,6 +254,14 @@ function App() {
         Your browser does not support the video tag.
       </video>
 
+      {/* --- 5. RENDER THE REWARD CHEST CONDITIONALLY --- */}
+      {showRewardChest && (
+        <RewardChest
+          onClaim={handleClaimReward}
+          onClose={() => setShowRewardChest(false)}
+        />
+      )}
+
       <div style={{ position: 'relative', zIndex: 10, backgroundColor: 'rgba(0,0,0,0.45)' }}>
         <main>
           {currentView === 'landing' && <Hero onConnectClick={handleConnectWallet} />}
@@ -281,4 +332,3 @@ function App() {
 }
 
 export default App;
-

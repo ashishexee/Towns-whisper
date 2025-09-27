@@ -1,5 +1,5 @@
 import Phaser from "phaser";
-import { getConversation, chooseLocation, setCurrentGameId } from "../api.js";
+import { getConversation, chooseLocation, setCurrentGameId,getTokenBalance } from "../api.js";
 
 export class MultiplayerScene extends Phaser.Scene {
   constructor() {
