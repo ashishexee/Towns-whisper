@@ -752,13 +752,17 @@ export class HomeScene extends Phaser.Scene {
     this.initialPlayerPos = { x: pixelX, y: pixelY };
     
     this.player = this.physics.add
-      .sprite(pixelX, pixelY, "player")
+      .sprite(pixelX, pixelY, "player_down") // Start with down-facing sprite
       .setOrigin(0.5)
       .setDisplaySize(this.tileSize, this.tileSize)
-      .setScale(0.12)
+      .setScale(0.08)
       .setPipeline("Light2D");
     this.player.setCollideWorldBounds(true);
     this.player.setDepth(10);
+
+    // Add direction tracking
+    this.player.currentDirection = 'down';
+    this.player.lastDirection = 'down';
 
     this.playerLight = this.lights
       .addLight(pixelX, pixelY, 250)
@@ -914,23 +918,54 @@ export class HomeScene extends Phaser.Scene {
     const speed = 110;
     let velocityX = 0;
     let velocityY = 0;
+    let newDirection = this.player.currentDirection;
+
+    // Determine movement direction and update sprite
     if (this.cursors.left.isDown || this.wasd.A.isDown) {
       velocityX = -speed;
+      newDirection = 'left';
     } else if (this.cursors.right.isDown || this.wasd.D.isDown) {
       velocityX = speed;
+      newDirection = 'right';
     }
+    
     if (this.cursors.up.isDown || this.wasd.W.isDown) {
       velocityY = -speed;
+      newDirection = 'up';
     } else if (this.cursors.down.isDown || this.wasd.S.isDown) {
       velocityY = speed;
+      newDirection = 'down';
     }
+
+    // Handle diagonal movement - prioritize the most recent input
     if (velocityX !== 0 && velocityY !== 0) {
-      const magnitude = Math.sqrt(
-        velocityX * velocityX + velocityY * velocityY
-      );
+      // For diagonal movement, keep the last single direction pressed
+      if (this.cursors.left.isDown || this.wasd.A.isDown) {
+        if ((this.cursors.up.isDown || this.wasd.W.isDown) && this.player.lastDirection !== 'up') {
+          newDirection = 'left';
+        } else if ((this.cursors.down.isDown || this.wasd.S.isDown) && this.player.lastDirection !== 'down') {
+          newDirection = 'left';
+        }
+      } else if (this.cursors.right.isDown || this.wasd.D.isDown) {
+        if ((this.cursors.up.isDown || this.wasd.W.isDown) && this.player.lastDirection !== 'up') {
+          newDirection = 'right';
+        } else if ((this.cursors.down.isDown || this.wasd.S.isDown) && this.player.lastDirection !== 'down') {
+          newDirection = 'right';
+        }
+      }
+      
+      const magnitude = Math.sqrt(velocityX * velocityX + velocityY * velocityY);
       velocityX = (velocityX / magnitude) * speed;
       velocityY = (velocityY / magnitude) * speed;
     }
+
+    // Update sprite texture if direction changed
+    if (newDirection !== this.player.currentDirection) {
+      this.player.setTexture(`player_${newDirection}`);
+      this.player.lastDirection = this.player.currentDirection;
+      this.player.currentDirection = newDirection;
+    }
+
     const delta = this.game.loop.delta / 1000;
     const nextX = this.player.x + velocityX * delta;
     const nextY = this.player.y + velocityY * delta;
@@ -948,12 +983,37 @@ export class HomeScene extends Phaser.Scene {
     this.villagers.getChildren().forEach(villager => {
         if (villager.lockIcon) {
             villager.lockIcon.setPosition(villager.x, villager.y - 25);
-            const isLocked = !!villager.requiredItem;
-            villager.lockIcon.setVisible(isLocked);
+            villager.lockIcon.setVisible(villager.requiredItem && !this.playerInventory.has(villager.requiredItem));
         }
     });
- 
-     this.handleInteraction();
+
+    // Check for nearby villagers
+    this.nearbyVillager = null;
+    this.villagers.getChildren().forEach((villager) => {
+      const distance = Phaser.Math.Distance.Between(
+        this.player.x,
+        this.player.y,
+        villager.x,
+        villager.y
+      );
+      if (distance < 50) {
+        this.nearbyVillager = villager;
+      }
+    });
+
+    if (this.nearbyVillager) {
+      this.interactionText.setVisible(true);
+      this.interactionText.setPosition(
+        this.nearbyVillager.x,
+        this.nearbyVillager.y - 40
+      );
+    } else {
+      this.interactionText.setVisible(false);
+    }
+
+    if (Phaser.Input.Keyboard.JustDown(this.enterKey) && this.nearbyVillager) {
+      this.handleInteraction();
+    }
   }
 
   // --- New Methods for Minting and Inventory ---

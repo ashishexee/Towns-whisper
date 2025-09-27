@@ -135,6 +135,12 @@ export class LoadingScene extends Phaser.Scene {
         this.scene.start(this.nextScene, this.dataToPass);
       });
     });
+
+    // Load player directional sprites
+    this.load.image('player_up', 'assets/images/characters/mc.png');
+    this.load.image('player_down', 'assets/images/characters/mc.png');
+    this.load.image('player_left', 'assets/images/characters/leftmc.png');
+    this.load.image('player_right', 'assets/images/characters/rightmc.png');
   }
 
   create() {
