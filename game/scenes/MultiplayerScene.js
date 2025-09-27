@@ -1,5 +1,5 @@
 import Phaser from "phaser";
-import { getConversation, chooseLocation, setCurrentGameId } from "../api.js";
+import { getConversation, chooseLocation, setCurrentGameId,getTokenBalance } from "../api.js";
 
 export class MultiplayerScene extends Phaser.Scene {
     constructor() {
@@ -18,6 +18,8 @@ export class MultiplayerScene extends Phaser.Scene {
         this.gameWon = false;
         this.otherPlayers = new Map();
         this.worldInitialized = false;
+        this.tokenBalanceElement = null;
+        this.currentBalance = 0;
     }
 
     preload() {
@@ -116,7 +118,63 @@ export class MultiplayerScene extends Phaser.Scene {
         this.cursors = this.input.keyboard.createCursorKeys();
         this.wasd = this.input.keyboard.addKeys("W,S,A,D");
         this.enterKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER);
+        this.createSimpleTokenBalance();
     }
+    createSimpleTokenBalance() {
+    // Create simple balance display (top-right to avoid multiplayer UI)
+    this.tokenBalanceElement = document.createElement('div');
+    this.tokenBalanceElement.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: rgba(0, 0, 0, 0.8);
+        border: 2px solid #fbbf24;
+        border-radius: 10px;
+        padding: 10px 15px;
+        color: white;
+        font-size: 14px;
+        font-weight: bold;
+        z-index: 1000;
+        font-family: Arial, sans-serif;
+        backdrop-filter: blur(5px);
+    `;
+    
+    this.tokenBalanceElement.innerHTML = `
+        <div style="display: flex; align-items: center;">
+            <span style="margin-right: 8px;">💰</span>
+            <span id="mp-balance-text" style="color: #fbbf24;">Loading...</span>
+            <button id="mp-refresh-btn" style="margin-left: 8px; background: none; border: none; color: #9ca3af; cursor: pointer; font-size: 12px;" title="Refresh">🔄</button>
+        </div>
+    `;
+    
+    document.body.appendChild(this.tokenBalanceElement);
+    
+    // Add refresh functionality
+    document.getElementById('mp-refresh-btn').onclick = () => this.updateTokenBalance();
+    
+    // Initial balance fetch
+    this.updateTokenBalance();
+    }  
+    async updateTokenBalance() {
+    if (!this.playerId) return; // Use playerId or account property
+    
+    try {
+        const result = await getTokenBalance(this.playerId);
+        if (result && result.status === 'success') {
+            this.currentBalance = result.balance;
+            const balanceElement = document.getElementById('mp-balance-text');
+            if (balanceElement) {
+                balanceElement.textContent = `${this.currentBalance.toLocaleString()} RN`;
+            }
+        }
+    } catch (error) {
+        console.error('Error fetching token balance in multiplayer:', error);
+        const balanceElement = document.getElementById('mp-balance-text');
+        if (balanceElement) {
+            balanceElement.textContent = 'Error';
+        }
+    }
+}
 
     setupUI() {
         // Create UI elements
@@ -899,6 +957,10 @@ export class MultiplayerScene extends Phaser.Scene {
         if (this.connectionTimeout) {
             clearTimeout(this.connectionTimeout);
             this.connectionTimeout = null;
+        }
+        if (this.tokenBalanceElement && this.tokenBalanceElement.parentNode) {
+        this.tokenBalanceElement.parentNode.removeChild(this.tokenBalanceElement);
+        this.tokenBalanceElement = null;
         }
     }
 }
