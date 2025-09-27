@@ -3,12 +3,24 @@
 
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from typing import Dict
+import uuid
+import os
+import traceback
+import sys
+from dotenv import load_dotenv
+from datetime import datetime, timedelta
+
+# --- IMPORTS WITH HEDERA SERVICE ---
 from schemas import *
 import traceback
 import uuid
 import json
 from typing import Dict, List
 from game_logic.engine import GameEngine
+from game_logic.state_manager import GameState
+from hedera_service import hedera_service
+# -------------------------
 import os
 
 app = FastAPI()
@@ -23,6 +35,9 @@ app.add_middleware(
 
 # Initialize the game engine
 game_engine = None
+
+# In-memory storage for user login tracking
+user_login_history = {}
 
 @app.on_event("startup")
 async def startup_event():
@@ -286,6 +301,128 @@ async def guess(game_id: str, request: GuessRequest):
         story=message
     )
 
+# --- CHEST ENDPOINTS FOR RUNE TOKEN SYSTEM ---
+
+@app.get("/balance/{account_id}")
+async def get_balance(account_id: str):
+    """Get the Rune Token balance for a specific Hedera account"""
+    try:
+        balance = await hedera_service.get_token_balance(account_id)
+        return {
+            "status": "success",
+            "account_id": account_id,
+            "balance": balance,
+            "token_symbol": "RN",
+            "token_name": "Rune Token"
+        }
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to get balance: {e}")
+
+@app.post("/chest/welcome")
+async def welcome_chest(request: OpenChestRequest):
+    """Send 250 Rune tokens as a first-time login bonus"""
+    try:
+        # Check if user has already received welcome bonus
+        if request.player_account_id in user_login_history:
+            if user_login_history[request.player_account_id].get('welcome_bonus_claimed', False):
+                raise HTTPException(status_code=400, detail="Welcome bonus already claimed")
+        else:
+            user_login_history[request.player_account_id] = {}
+        
+        result = await hedera_service.send_welcome_bonus(request.player_account_id)
+        
+        if result['status'] == 'success':
+            # Mark welcome bonus as claimed
+            user_login_history[request.player_account_id]['welcome_bonus_claimed'] = True
+            user_login_history[request.player_account_id]['first_login'] = datetime.now()
+            
+            return {
+                "status": "success",
+                "message": "Welcome bonus scheduled! You'll receive 250 Rune tokens in 1 minute.",
+                "amount": 250,
+                "schedule_id": result['schedule_id'],
+                "execution_time": result['execution_time']
+            }
+        else:
+            raise HTTPException(status_code=500, detail=result['message'])
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to process welcome bonus: {e}")
+
+@app.post("/chest/daily")
+async def daily_chest(request: OpenChestRequest):
+    """Send daily login reward (50, 100, or 200 tokens) if 24 hours have passed"""
+    try:
+        current_time = datetime.now()
+        
+        # Check if user exists in login history
+        if request.player_account_id not in user_login_history:
+            user_login_history[request.player_account_id] = {}
+        
+        user_data = user_login_history[request.player_account_id]
+        last_daily = user_data.get('last_daily_claim')
+        
+        # Check if 24 hours have passed since last daily reward
+        if last_daily:
+            time_since_last = current_time - last_daily
+            if time_since_last < timedelta(hours=24):
+                hours_remaining = 24 - time_since_last.total_seconds() / 3600
+                raise HTTPException(
+                    status_code=400, 
+                    detail=f"Daily chest already claimed. Try again in {hours_remaining:.1f} hours."
+                )
+        
+        result = await hedera_service.send_daily_login_reward(request.player_account_id)
+        
+        if result['status'] == 'success':
+            # Update last daily claim time
+            user_login_history[request.player_account_id]['last_daily_claim'] = current_time
+            
+            return {
+                "status": "success",
+                "message": f"Daily reward scheduled! You'll receive {result['amount']} Rune tokens in 5 minutes.",
+                "amount": result['amount'],
+                "schedule_id": result['schedule_id'],
+                "execution_time": result['execution_time']
+            }
+        else:
+            raise HTTPException(status_code=500, detail=result['message'])
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to process daily reward: {e}")
+
+@app.post("/chest/open")
+async def victory_chest(request: OpenChestRequest):
+    """Send victory reward (1000, 1500, or 2000 tokens) after winning a game"""
+    try:
+        result = await hedera_service.send_victory_reward(request.player_account_id)
+        
+        if result['status'] == 'success':
+            return {
+                "status": "success",
+                "message": f"Victory reward scheduled! You'll receive {result['amount']} Rune tokens in 30 minutes.",
+                "amount": result['amount'],
+                "schedule_id": result['schedule_id'],
+                "execution_time": result['execution_time']
+            }
+        else:
+            raise HTTPException(status_code=500, detail=result['message'])
+            
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to process victory reward: {e}")
+
+@app.get("/ping")
+async def ping():
+    """Health check endpoint"""
+    return {"message": "Server is running", "timestamp": datetime.now().isoformat()}
 @app.post("/create_room")
 async def create_room():
     room_id = str(uuid.uuid4())[:8]

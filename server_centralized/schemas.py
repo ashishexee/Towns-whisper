@@ -5,6 +5,7 @@
 from pydantic import BaseModel
 from typing import List, Dict, Optional
 
+# Game-related schemas
 class NewGameRequest(BaseModel):
     difficulty: str = "medium"
     num_inaccessible_locations: int = 5
@@ -36,6 +37,7 @@ class GuessResponse(BaseModel):
     message: str
     story: Optional[str] = None
 
+# Rune Token / Chest system schemas
 class OpenChestRequest(BaseModel):
     """The request from the game client when a player opens a chest."""
     player_account_id: str
@@ -45,3 +47,19 @@ class OpenChestResponse(BaseModel):
     status: str
     message: str
     schedule_id: Optional[str] = None
+
+class BalanceResponse(BaseModel):
+    """Response for token balance queries."""
+    status: str
+    account_id: str
+    balance: int
+    token_symbol: str
+    token_name: str
+
+class ChestRewardResponse(BaseModel):
+    """Response for all chest reward endpoints (welcome, daily, victory)."""
+    status: str
+    message: str
+    amount: int
+    schedule_id: str
+    execution_time: str
