@@ -14,23 +14,25 @@ const ChallengeScreen = ({ onAccept, onDecline }) => {
   const MIN_STAKE = 0.01;
   const MAX_STAKE = 0.1;
 
-  const stakeAmount = useMemo(() => {
-    if (!isStaking) return 0;
-    const normalizedTime = (time - MIN_TIME) / (MAX_TIME - MIN_TIME);
-    const stake = MAX_STAKE - normalizedTime * (MAX_STAKE - MIN_STAKE);
-    return parseFloat(stake.toFixed(4));
-  }, [time, isStaking]);
+  const [stakeAmount, setStakeAmount] = useState(MIN_STAKE);
 
   const rewardAmount = useMemo(() => {
-    return (stakeAmount * 2).toFixed(4);
-  }, [stakeAmount]);
+    if (!isStaking) return 0;
+    // normalizedTime is 1 for the shortest duration, 0 for the longest.
+    const normalizedTime = (MAX_TIME - time) / (MAX_TIME - MIN_TIME); 
+    const maxMultiplier = 2.5; // 2.5x reward for shortest time
+    const minMultiplier = 1.5; // 1.5x reward for longest time
+    const rewardMultiplier = minMultiplier + normalizedTime * (maxMultiplier - minMultiplier);
+    const reward = stakeAmount * rewardMultiplier;
+    return parseFloat(reward.toFixed(4));
+  }, [time, stakeAmount, isStaking]);
 
   const handleAccept = () => {
     if (isStaking) {
       onAccept({
         difficulty: 'Medium', // Always pass Medium for staking mode
         isStaking: true,
-        stakeAmount: `${stakeAmount} ETH`,
+        stakeAmount: `${stakeAmount.toFixed(4)} ETH`,
         rewardAmount: `${rewardAmount} ETH`,
         timeLimit: `${time} minutes`,
       });
@@ -106,9 +108,10 @@ const ChallengeScreen = ({ onAccept, onDecline }) => {
         {isStaking ? (
           // STAKING UI
           <div className="animate-fade-in">
+            {/* Time Selection */}
             <div className="mb-8">
               <h3 className="text-2xl font-cinzel text-yellow-400 mb-4">Set Your Time</h3>
-              <p className="font-merriweather text-gray-400 mb-4">How long do you need? Less time means a higher risk and a greater reward.</p>
+              <p className="font-merriweather text-gray-400 mb-4">A shorter time limit increases your risk and potential reward multiplier.</p>
               <div className="flex items-center justify-center gap-4">
                 <span className="font-bold text-lg">{MIN_TIME} min</span>
                 <input
@@ -124,6 +127,27 @@ const ChallengeScreen = ({ onAccept, onDecline }) => {
               <p className="text-2xl font-bold text-white mt-3">{time} Minutes</p>
             </div>
 
+            {/* Stake Amount Selection */}
+            <div className="mb-8">
+              <h3 className="text-2xl font-cinzel text-yellow-400 mb-4">Set Your Stake</h3>
+              <p className="font-merriweather text-gray-400 mb-4">Choose the amount of ETH you wish to wager.</p>
+              <div className="flex items-center justify-center gap-4">
+                <span className="font-bold text-lg">{MIN_STAKE} ETH</span>
+                <input
+                  type="range"
+                  min={MIN_STAKE}
+                  max={MAX_STAKE}
+                  step={0.001}
+                  value={stakeAmount}
+                  onChange={(e) => setStakeAmount(parseFloat(e.target.value))}
+                  className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-yellow-400"
+                />
+                <span className="font-bold text-lg">{MAX_STAKE} ETH</span>
+              </div>
+              <p className="text-2xl font-bold text-white mt-3">{stakeAmount.toFixed(4)} ETH</p>
+            </div>
+
+            {/* Wager Details */}
             <div className="mb-8 p-6 bg-gray-800/50 border border-yellow-400/30 rounded-lg">
                 <h4 className="text-2xl font-cinzel text-yellow-300 mb-4">Wager Details</h4>
                 <div className="grid grid-cols-2 gap-4 text-lg font-merriweather">
@@ -133,7 +157,7 @@ const ChallengeScreen = ({ onAccept, onDecline }) => {
                     </div>
                     <div className="text-right">
                         <p className="text-gray-400">Your Stake:</p>
-                        <p className="font-bold text-yellow-400 text-xl">{stakeAmount} ETH</p>
+                        <p className="font-bold text-yellow-400 text-xl">{stakeAmount.toFixed(4)} ETH</p>
                     </div>
                     <div className="col-span-2 text-center mt-2">
                         <p className="text-gray-400">Potential Reward:</p>

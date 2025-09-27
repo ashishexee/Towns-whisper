@@ -92,7 +92,6 @@ export class EndScene extends Phaser.Scene {
         this.submissionStatusText.setText('Submitting score to the blockchain...');
 
         try {
-            // HERE the integration of a function to submit the score to an EVM contract is to be done.
             console.log(`Simulating score submission for ${account}: ${finalScore}`);
             await new Promise(resolve => setTimeout(resolve, 1500));
 
