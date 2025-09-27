@@ -6,7 +6,7 @@ import IntroductionPanel from './components/IntroductionPanel';
 import CharacterIntro from './components/CharacterIntro';
 import GameplayMechanics from './components/GameplayMechanics';
 import Conversation from './components/Conversation';
-import GameModeSelection from './components/gameModeSelection';
+import GameModeSelection from './components/gameplayMechanics'; // UPDATED
 import ChallengeScreen from './components/challengeScreen';
 import UserRegistration from './components/UserRegistration';
 import { UserRegistryService } from './utils/userRegistry';
@@ -178,6 +178,8 @@ function App() {
               onCreateRoom={handleCreateRoom}
               onJoinRoom={handleJoinRoom}
               username={username}
+              walletAddress={walletAddress}
+              userRegistryService={userRegistryService}
             />
           )}
 
