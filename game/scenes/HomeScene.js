@@ -1,5 +1,7 @@
 import Phaser from "phaser";
 import { startNewGame, getConversation, getTokenBalance, claimWelcomeBonus, claimDailyReward } from "../api";
+import { GAME_ITEMS_ABI, CONTRACT_ADDRESSES } from '../../contracts_eth/config.js';
+import { ethers } from 'ethers';
 
 export class HomeScene extends Phaser.Scene {
   constructor() {
@@ -1170,19 +1172,45 @@ async claimDailyReward() {
         return;
     }
 
+    if (typeof window.ethereum === 'undefined') {
+        console.error("MetaMask or a compatible wallet is not installed.");
+        this.showErrorMessage("Please install a wallet like MetaMask.");
+        return;
+    }
+
     this.input.keyboard.enabled = false;
     const mintingStatusText = this.add.text(this.cameras.main.centerX, this.cameras.main.centerY, `Minting ${itemName}...`, {
         fontSize: '24px', color: '#d4af37', backgroundColor: 'rgba(0,0,0,0.8)', padding: { x: 20, y: 10 }
     }).setOrigin(0.5).setDepth(101);
 
     try {
-        // HERE the integration of an NFT minting function on an EVM contract is to be done.
-        console.log(`Simulating mint for: ${itemName}`);
-        await new Promise(resolve => setTimeout(resolve, 1500));
-
-        console.log("Mint successful!");
-        mintingStatusText.setText(`${itemName} minted successfully!`);
+        const provider = new ethers.BrowserProvider(window.ethereum);
+        const signer = await provider.getSigner();
         
+        // Use the imported address and ABI
+        const gameItemsContract = new ethers.Contract(CONTRACT_ADDRESSES.gameItems, GAME_ITEMS_ABI, signer);
+
+        const itemNameFormatted = itemName.replace(/_/g, ' ');
+        // It's good practice to host metadata for your NFTs
+        const tokenURI = `https://your-metadata-server.com/items/${itemName.toLowerCase()}.json`; 
+        const description = `A trusty ${itemNameFormatted} for your adventures.`;
+
+        mintingStatusText.setText("Please confirm in wallet...");
+
+        const tx = await gameItemsContract.mintItemTo(
+            this.account,
+            tokenURI,
+            itemNameFormatted,
+            description
+        );
+
+        mintingStatusText.setText("Transaction sent. Waiting for confirmation...");
+        const receipt = await tx.wait(); // Wait for the transaction to be mined
+
+        console.log("Mint successful! Transaction:", receipt.hash);
+        mintingStatusText.setText(`${itemNameFormatted} minted successfully!`);
+        
+        // This is an "optimistic" update. The next step is to verify on-chain.
         this.playerInventory.add(itemName);
         await this.updateInventory();
         
@@ -1192,15 +1220,21 @@ async claimDailyReward() {
 
     } catch (error) {
         console.error("Minting failed:", error);
-        mintingStatusText.setText(`Minting failed. See console for details.`);
+        let errorMessage = "Minting failed. See console.";
+        if (error.code === 'ACTION_REJECTED') {
+            errorMessage = "Transaction rejected.";
+        } else if (error.reason) {
+            // Display contract revert reasons
+            errorMessage = `Minting failed: ${error.reason}`;
+        }
+        mintingStatusText.setText(errorMessage);
     } finally {
-        this.time.delayedCall(2000, () => {
+        this.time.delayedCall(3000, () => {
             mintingStatusText.destroy();
             this.input.keyboard.enabled = true;
         });
     }
   }
-
   async updateInventory() {
     if (!this.account) return;
 

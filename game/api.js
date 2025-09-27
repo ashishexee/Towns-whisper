@@ -6,6 +6,12 @@ let currentGameId = null;
  * @param {string} difficulty The difficulty level ('easy', 'medium', 'hard').
  * @returns {Promise<string|null>} The new game ID, or null if it fails.
  */
+
+export function setCurrentGameId(gameId) {
+    console.log(`API: Current game ID set to ${gameId}`);
+    currentGameId = gameId;
+}
+
 async function startNewGame(difficulty) {
   try {
     console.log("Difficulty level - ", difficulty);

@@ -2,11 +2,9 @@
 pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
-import "@openzeppelin/contracts/access/AccessControl.sol";
 
-/// @notice ERC721 collectible used by the game. TreasureBox will be granted MINTER_ROLE to mint items.
-contract GameItems is ERC721URIStorage, AccessControl {
-    bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
+/// @notice ERC721 collectible used by the game. Anyone can mint items.
+contract GameItems is ERC721URIStorage {
     uint256 private _nextId;
 
     struct Item {
@@ -18,17 +16,16 @@ contract GameItems is ERC721URIStorage, AccessControl {
     event ItemMinted(address indexed to, uint256 indexed id, string name);
 
     constructor() ERC721("EchoesItem", "EITEM") {
-        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        _grantRole(MINTER_ROLE, msg.sender);
+        // No roles needed
     }
 
-    /// @notice Mint to arbitrary address. Only accounts with MINTER_ROLE can call.
+    /// @notice Mint to an arbitrary address. Anyone can call this function.
     function mintItemTo(
         address to,
         string memory tokenURI,
         string memory name_,
         string memory description_
-    ) external onlyRole(MINTER_ROLE) returns (uint256) {
+    ) external returns (uint256) {
         _nextId++;
         uint256 id = _nextId;
         _safeMint(to, id);
@@ -49,15 +46,6 @@ contract GameItems is ERC721URIStorage, AccessControl {
         return (it.name, it.description, ownerOf(tokenId), tokenURI(tokenId));
     }
 
-    // FIX: Override the supportsInterface function to resolve the conflict
-    // between ERC721URIStorage and AccessControl.
-    function supportsInterface(bytes4 interfaceId)
-        public
-        view
-        override(ERC721URIStorage, AccessControl)
-        returns (bool)
-    {
-        return super.supportsInterface(interfaceId);
-    }
+    // The supportsInterface override is no longer needed as the conflict is resolved
+    // by removing AccessControl.
 }
-

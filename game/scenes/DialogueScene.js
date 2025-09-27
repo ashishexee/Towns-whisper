@@ -38,12 +38,6 @@ export class DialogueScene extends Phaser.Scene {
         }
     }
     
-    if (!this.conversationData.npc_dialogue) {
-        console.error("No npc_dialogue in conversation data:", this.conversationData);
-        return;
-    }
-}
-
     create() {
         console.log("DialogueScene create - conversationData:", this.conversationData);
         
@@ -358,3 +352,4 @@ export class DialogueScene extends Phaser.Scene {
         this.stopSpeaking();
     }
 }
+
