@@ -32,3 +32,13 @@ class GuessResponse(BaseModel):
     is_correct: bool
     is_true_ending: bool
     message: str
+
+class OpenChestRequest(BaseModel):
+    """The request from the game client when a player opens a chest."""
+    player_account_id: str
+
+class OpenChestResponse(BaseModel):
+    """The response sent back after attempting to schedule the reward."""
+    status: str
+    message: str
+    schedule_id: Optional[str] = None
