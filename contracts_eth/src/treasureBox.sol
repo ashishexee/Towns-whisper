@@ -5,7 +5,6 @@ pragma solidity ^0.8.20;
 import "@chainlink/contracts/src/v0.8/VRFConsumerBaseV2.sol";
 import "@chainlink/contracts/src/v0.8/interfaces/VRFCoordinatorV2Interface.sol";
 import "@chainlink/contracts/v0.8/automation/AutomationCompatible.sol";
-
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 interface IGameItems {
