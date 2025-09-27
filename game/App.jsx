@@ -4,10 +4,12 @@ import PhaserGame from './components/phaserGame';
 import Hero from './components/landing';
 import IntroductionPanel from './components/IntroductionPanel';
 import CharacterIntro from './components/CharacterIntro';
-import GameplayMechanics from './components/GameplayMechanics';
+import GameModeSelectionCard from './components/GameplayMechanics'; // Changed this line
 import Conversation from './components/Conversation';
-import GameModeSelection from './components/gameModeSelection';
+import GameModeSelection from './components/gameModeSelection'; 
 import ChallengeScreen from './components/challengeScreen';
+import UserRegistration from './components/UserRegistration';
+import { UserRegistryService } from './utils/userRegistry';
 
 function App() {
   const [currentView, setCurrentView] = useState('landing'); // 'landing', 'gameMode', 'challenge', 'game'
@@ -15,6 +17,8 @@ function App() {
   const [showConversation, setShowConversation] = useState(false);
   const [hasConversationTriggered, setHasConversationTriggered] = useState(false);
   const [walletAddress, setWalletAddress] = useState(null);
+  const [userRegistryService, setUserRegistryService] = useState(null);
+  const [username, setUsername] = useState('');
   const videoRef = useRef(null);
 
   const dialogues = [
@@ -33,18 +37,30 @@ function App() {
     }
 
     try {
-      // Using ethers.js is a robust way to connect.
-      // It handles many wallet-specific quirks automatically.
       const provider = new ethers.BrowserProvider(window.ethereum);
-      
-      // This single call will prompt the user to connect if they aren't already
       const signer = await provider.getSigner();
-      
       const address = await signer.getAddress();
       
+      // Initialize user registry service
+      const registryService = new UserRegistryService(provider, signer);
+      setUserRegistryService(registryService);
+      
+      // Check if user is already registered
+      const isRegistered = await registryService.isUserRegistered(address);
+      
       setWalletAddress(address);
-      setCurrentView('gameMode'); // Change view on successful connect
-      console.log("Connected wallet:", address);
+      
+      if (isRegistered) {
+        // Get user info and proceed to game mode
+        const userInfo = await registryService.getUserInfo(address);
+        setUsername(userInfo.username);
+        setCurrentView('gameMode');
+        console.log("Returning user:", userInfo.username);
+      } else {
+        // Show registration screen
+        setCurrentView('registration');
+        console.log("New user, showing registration");
+      }
 
     } catch (error) {
       console.error("Wallet connection failed:", error);
@@ -54,6 +70,19 @@ function App() {
         alert("Could not connect to the wallet. Please ensure it's unlocked and try again.");
       }
     }
+  };
+
+  const handleUserRegistration = (registeredUsername) => {
+    setUsername(registeredUsername);
+    setCurrentView('gameMode');
+    console.log("User registered successfully:", registeredUsername);
+  };
+
+  const handleRegistrationCancel = () => {
+    // Reset wallet connection
+    setWalletAddress(null);
+    setUserRegistryService(null);
+    setCurrentView('landing');
   };
 
   const handlePlaySingle = () => {
@@ -148,6 +177,9 @@ function App() {
               onPlaySingle={handlePlaySingle}
               onCreateRoom={handleCreateRoom}
               onJoinRoom={handleJoinRoom}
+              username={username}
+              walletAddress={walletAddress}
+              userRegistryService={userRegistryService}
             />
           )}
 
@@ -158,12 +190,20 @@ function App() {
             />
           )}
 
+          {currentView === 'registration' && (
+            <UserRegistration 
+              onRegister={handleUserRegistration}
+              onCancel={handleRegistrationCancel}
+              userRegistryService={userRegistryService}
+            />
+          )}
+
           {/* The landing page content is now part of the main view logic */}
           {currentView === 'landing' && (
             <>
               <IntroductionPanel />
               <CharacterIntro />
-              <GameplayMechanics onPlayClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} />
+              <GameModeSelectionCard onPlayClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} />
             </>
           )}
             {showConversation && (
