@@ -4,9 +4,9 @@ import PhaserGame from './components/phaserGame';
 import Hero from './components/landing';
 import IntroductionPanel from './components/IntroductionPanel';
 import CharacterIntro from './components/CharacterIntro';
-import GameplayMechanics from './components/GameplayMechanics';
+import GameModeSelectionCard from './components/GameplayMechanics'; // Changed this line
 import Conversation from './components/Conversation';
-import GameModeSelection from './components/gameModeSelection'; // UPDATED
+import GameModeSelection from './components/gameModeSelection'; 
 import ChallengeScreen from './components/challengeScreen';
 import UserRegistration from './components/UserRegistration';
 import { UserRegistryService } from './utils/userRegistry';
@@ -203,7 +203,7 @@ function App() {
             <>
               <IntroductionPanel />
               <CharacterIntro />
-              <GameplayMechanics onPlayClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} />
+              <GameModeSelectionCard onPlayClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} />
             </>
           )}
             {showConversation && (
