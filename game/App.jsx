@@ -1,15 +1,17 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ethers } from 'ethers';
-import PhaserGame from './components/PhaserGame';
+import PhaserGame from './components/phaserGame';
 import Hero from './components/landing';
 import IntroductionPanel from './components/IntroductionPanel';
 import CharacterIntro from './components/CharacterIntro';
 import GameplayMechanics from './components/GameplayMechanics';
 import Conversation from './components/Conversation';
 import GameModeSelection from './components/gameModeSelection';
+import ChallengeScreen from './components/challengeScreen';
 
 function App() {
-  const [isGameVisible, setGameVisible] = useState(false);
+  const [currentView, setCurrentView] = useState('landing'); // 'landing', 'gameMode', 'challenge', 'game'
+  const [gameConfig, setGameConfig] = useState(null);
   const [showConversation, setShowConversation] = useState(false);
   const [hasConversationTriggered, setHasConversationTriggered] = useState(false);
   const [walletAddress, setWalletAddress] = useState(null);
@@ -41,6 +43,7 @@ function App() {
       const address = await signer.getAddress();
       
       setWalletAddress(address);
+      setCurrentView('gameMode'); // Change view on successful connect
       console.log("Connected wallet:", address);
 
     } catch (error) {
@@ -54,7 +57,7 @@ function App() {
   };
 
   const handlePlaySingle = () => {
-    setGameVisible(true);
+    setCurrentView('challenge'); // Show challenge screen
   };
 
   const handleCreateRoom = () => {
@@ -63,6 +66,36 @@ function App() {
 
   const handleJoinRoom = () => {
     alert("Join Room feature coming soon!");
+  };
+
+  const handleAcceptChallenge = (challengeConfig) => {
+    // In a real scenario, you would trigger a smart contract interaction here
+    // if challengeConfig.isStaking is true.
+    if (challengeConfig.isStaking) {
+      console.log(`Staking ${challengeConfig.stakeAmount} for a ${challengeConfig.difficulty} challenge.`);
+      // This is a placeholder. The actual transaction would need to resolve
+      // before the game starts.
+      alert(`Staking ${challengeConfig.stakeAmount} is a feature in development. Proceeding without an on-chain transaction for now.`);
+    }
+
+    setGameConfig({
+      difficulty: challengeConfig.difficulty,
+      isStaking: challengeConfig.isStaking,
+      stakeAmount: challengeConfig.stakeAmount,
+      timeLimit: challengeConfig.timeLimit,
+      account: walletAddress,
+      playerGender: 'Male' // Still a placeholder
+    });
+    setCurrentView('game');
+    
+    console.log("Game config set:", {
+      difficulty: challengeConfig.difficulty,
+      account: walletAddress
+    });
+  };
+
+  const handleDeclineChallenge = () => {
+    setCurrentView('gameMode');
   };
 
   // This effect now triggers the conversation on user scroll, but only once.
@@ -87,12 +120,12 @@ function App() {
     };
   }, [hasConversationTriggered]); // Dependency array now correctly tracks the trigger state.
 
-  if (isGameVisible) {
-    return <PhaserGame />;
+  if (currentView === 'game') {
+    return <PhaserGame gameConfig={gameConfig} />;
   }
 
   return (
-    <div className="bg-gray-900">
+    <div className="bg-gray-900 text-white">
       <video
         ref={videoRef}
         autoPlay
@@ -108,14 +141,30 @@ function App() {
 
       <div style={{ position: 'relative', zIndex: 10, backgroundColor: 'rgba(0,0,0,0.45)' }}>
         <main>
-          {!walletAddress ? (
-            <Hero onConnectClick={handleConnectWallet} />
-          ) : (
+          {currentView === 'landing' && <Hero onConnectClick={handleConnectWallet} />}
+          
+          {currentView === 'gameMode' && (
             <GameModeSelection
               onPlaySingle={handlePlaySingle}
               onCreateRoom={handleCreateRoom}
               onJoinRoom={handleJoinRoom}
             />
+          )}
+
+          {currentView === 'challenge' && (
+            <ChallengeScreen
+              onAccept={handleAcceptChallenge}
+              onDecline={handleDeclineChallenge}
+            />
+          )}
+
+          {/* The landing page content is now part of the main view logic */}
+          {currentView === 'landing' && (
+            <>
+              <IntroductionPanel />
+              <CharacterIntro />
+              <GameplayMechanics onPlayClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} />
+            </>
           )}
             {showConversation && (
               <Conversation
@@ -126,9 +175,6 @@ function App() {
                 }}
               />
             )}
-          <IntroductionPanel />
-          <CharacterIntro />
-          <GameplayMechanics onPlayClick={() => setGameVisible(true)} />
         </main>
       </div>
     </div>
