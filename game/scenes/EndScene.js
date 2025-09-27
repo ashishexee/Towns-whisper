@@ -28,6 +28,11 @@ export class EndScene extends Phaser.Scene {
             stroke: '#000000',
             strokeThickness: 4
         }).setOrigin(0.5);
+        if (this.endGameData.isCorrect) {
+           console.log("Player won! Dispatching gameWon event.");
+           // This is the "shout" to the React UI
+           window.dispatchEvent(new CustomEvent('gameWon'));
+}
 
         if (this.endGameData.isTrueEnding) {
             this.add.text(centerX, centerY - 140, 'You uncovered the true story!', {
