@@ -1,10 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import Phaser from 'phaser';
-import { WalletScene } from "../scenes/WalletScene.js";
-import { MenuScene } from "../scenes/MenuScene.js";
 import { LoadingScene } from "../scenes/LoadingScene.js";
 import { HomeScene } from "../scenes/HomeScene.js";
-import { LeaderboardScene } from "../scenes/LeaderboardScene.js";
 import { DialogueScene } from "../scenes/DialogueScene.js";
 import { VideoScene } from "../scenes/VideoScene.js";
 import { UIScene } from "../scenes/UIScene.js";
