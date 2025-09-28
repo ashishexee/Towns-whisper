@@ -1,4 +1,9 @@
 import Phaser from "phaser";
+import { ethers } from "ethers";
+import {
+  GAME_ITEMS_ABI,
+  CONTRACT_ADDRESSES,
+} from "../../contracts_eth/config.js";
 
 export class ItemLockScene extends Phaser.Scene {
   constructor() {
@@ -17,7 +22,6 @@ export class ItemLockScene extends Phaser.Scene {
     this.callingScene = data.callingScene || "HomeScene";
     console.log(`Called from scene: ${this.callingScene}`);
   }
-
   create() {
     // Make sure we're on top of other scenes
     this.scene.bringToTop();
@@ -91,7 +95,7 @@ export class ItemLockScene extends Phaser.Scene {
     const padding = 20;
 
     // Continue button (if player has the item)
-    const continueButton = this.add
+    this.tradeButton = this.add
       .rectangle(
         width / 2 - buttonWidth - padding / 2,
         panelY + panelHeight - 50,
@@ -104,14 +108,14 @@ export class ItemLockScene extends Phaser.Scene {
       .setInteractive({ useHandCursor: true });
 
     const continueText = this.add
-      .text(continueButton.x, continueButton.y, "Use Item", {
+      .text(this.tradeButton.x, this.tradeButton.y, "Use Item", {
         fontSize: "16px",
         color: "#ffffff",
       })
       .setOrigin(0.5)
       .setDepth(13);
 
-    continueButton.on("pointerdown", () => {
+    this.tradeButton.on("pointerdown", () => {
       this.tradeAndBurnItem();
     });
 
@@ -151,55 +155,82 @@ export class ItemLockScene extends Phaser.Scene {
       return;
     }
 
+    if (typeof window.ethereum === "undefined") {
+      this.statusText.setText("Please install a wallet like MetaMask.");
+      return;
+    }
+
+    this.tradeButton.disableInteractive().setAlpha(0.5);
     this.statusText.setText("Checking your inventory...");
 
     try {
-      // Get the calling scene instance
       const callingScene = this.scene.get(this.callingScene);
-
-      console.log(
-        `Checking inventory in ${this.callingScene}:`,
-        callingScene.playerInventory,
-        "Looking for:",
-        this.villager.requiredItem
-      );
+      const itemName = this.villager.requiredItem;
+      const itemNameFormatted = itemName.replace(/_/g, " ");
 
       if (
-        callingScene &&
-        callingScene.playerInventory &&
-        callingScene.playerInventory.has(this.villager.requiredItem)
+        !callingScene ||
+        !callingScene.playerInventory ||
+        !callingScene.playerInventory.has(itemName)
       ) {
-        this.statusText.setText(
-          `Using ${this.villager.requiredItem.replace(/_/g, " ")}...`
-        );
-
-        await new Promise((resolve) => setTimeout(resolve, 1500));
-
-        // Remove the item from inventory
-        callingScene.playerInventory.delete(this.villager.requiredItem);
-
-        this.statusText.setText("Success! The villager will talk to you now.");
-
-        // Wait a moment then close scene and unlock villager
-        this.time.delayedCall(2000, () => {
-          console.log(`Unlocking villager ${this.villager.name}`);
-          callingScene.events.emit("villagerUnlocked", this.villager.name);
-          this.scene.resume(this.callingScene);
-          this.scene.stop();
-        });
-      } else {
-        this.statusText.setText(
-          `You don't have a ${this.villager.requiredItem.replace(/_/g, " ")}.`
-        );
-
-        // Auto-close after delay if no item
-        this.time.delayedCall(2000, () => {
-          this.closeScene();
-        });
+        this.statusText.setText(`You don't have a ${itemNameFormatted}.`);
+        this.tradeButton.setInteractive().setAlpha(1);
+        return;
       }
+
+      const tokenId = callingScene.playerInventory.get(itemName);
+      if (tokenId === null || tokenId === undefined) {
+        this.statusText.setText(
+          `Error: Could not find a valid Token ID for ${itemNameFormatted}.`
+        );
+        console.error(
+          `Token ID for ${itemName} is null or undefined. Cannot burn.`
+        );
+        this.tradeButton.setInteractive().setAlpha(1);
+        return;
+      }
+
+      this.statusText.setText(`Preparing to trade ${itemNameFormatted}...`);
+
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const signer = await provider.getSigner();
+      const gameItemsContract = new ethers.Contract(
+        CONTRACT_ADDRESSES.gameItems,
+        GAME_ITEMS_ABI,
+        signer
+      );
+
+      this.statusText.setText("Please confirm in your wallet...");
+
+      // Assuming a standard ERC721 burn function that takes the tokenId
+      const tx = await gameItemsContract.burn(tokenId);
+
+      this.statusText.setText("Transaction sent. Waiting for confirmation...");
+      const receipt = await tx.wait();
+
+      console.log("Burn successful! Transaction:", receipt.hash);
+      this.statusText.setText(`${itemNameFormatted} has been traded!`);
+
+      // Update inventory in the calling scene
+      callingScene.playerInventory.delete(itemName);
+
+      // Emit event to unlock the villager
+      callingScene.events.emit("villagerUnlocked", this.villager.name);
+
+      this.time.delayedCall(2000, () => {
+        this.scene.stop();
+        callingScene.scene.resume();
+      });
     } catch (error) {
-      console.error("Item use failed:", error);
-      this.statusText.setText("Error occurred. See console for details.");
+      console.error("Trade/burn item failed:", error);
+      let errorMessage = "Transaction failed. See console.";
+      if (error.code === "ACTION_REJECTED") {
+        errorMessage = "Transaction rejected.";
+      } else if (error.reason) {
+        errorMessage = `Error: ${error.reason}`;
+      }
+      this.statusText.setText(errorMessage);
+      this.tradeButton.setInteractive().setAlpha(1);
     }
   }
 

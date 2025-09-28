@@ -5,8 +5,8 @@ import ERC20_ABI_JSON from '../game/abi/abi_erc20.json' assert { type: 'json' };
 
 // Define your contract addresses
 const addresses = {
-    gameItems: '0xbb7Fa14530376c15701ea3c603e9a19a38Fc15Ab',
-    stakingManager: '0xB6fE57065a91EE055200E20F521F07b329A74623',
+    gameItems: '0x8ad995e826c0f09452bab2eac57d625cf4e14830',
+    stakingManager: '0x8ad995e826c0f09452bab2eac57d625cf4e14830',
     tradeManager: '0x79475AD66448E206F77467A8d0F0F0b23337eA31', // <-- FIX THIS ADDRESS
     runeCoin: '0x0000000000000000000000000000000000697ded' // <-- ADD YOUR TOKEN ADDRESS
 };

@@ -24,7 +24,7 @@ export class HomeScene extends Phaser.Scene {
     this.resetFeedbackText = null;
     // this.chainClient = null; // PREVIOUS CHAIN INTEGRATION REMOVED
     this.account = null;
-    this.playerInventory = new Set();
+    this.playerInventory = new Map();
     this.mintKey = null;
     this.activeMintZone = null;
     this.mintText = null;
@@ -1246,10 +1246,8 @@ async claimDailyReward() {
     this.villagers.getChildren().forEach((villager) => {
       if (villager.lockIcon) {
         villager.lockIcon.setPosition(villager.x, villager.y - 25);
-        villager.lockIcon.setVisible(
-          villager.requiredItem &&
-            !this.playerInventory.has(villager.requiredItem)
-        );
+        // The lock icon should be visible as long as an item is required.
+        villager.lockIcon.setVisible(!!villager.requiredItem);
       }
     });
 
@@ -1269,9 +1267,13 @@ async claimDailyReward() {
 
     // Update interaction text visibility and content
     if (this.nearbyVillager) {
-      if (this.nearbyVillager.requiredItem && !this.playerInventory.has(this.nearbyVillager.requiredItem)) {
+      if (this.nearbyVillager.requiredItem) {
         const itemName = this.nearbyVillager.requiredItem.replace(/_/g, ' ');
-        this.interactionText.setText(`Requires: ${itemName}`);
+        if (this.playerInventory.has(this.nearbyVillager.requiredItem)) {
+          this.interactionText.setText(`Press ENTER to use ${itemName}`);
+        } else {
+          this.interactionText.setText(`Requires: ${itemName}`);
+        }
       } else {
         this.interactionText.setText("Press ENTER to talk");
       }
@@ -1294,13 +1296,14 @@ async claimDailyReward() {
   startConversation() {
     if (!this.nearbyVillager) return;
 
-    // If villager requires an item and player doesn't have it
-    if (this.nearbyVillager.requiredItem && !this.playerInventory.has(this.nearbyVillager.requiredItem)) {
+    // If villager requires an item, launch the item lock scene to handle the trade
+    if (this.nearbyVillager.requiredItem) {
       this.scene.pause();
       this.scene.launch('ItemLockScene', {
         villager: this.nearbyVillager,
         account: this.account,
-        gameData: this.gameData
+        gameData: this.gameData,
+        callingScene: 'HomeScene' // Pass the calling scene's key
       });
       return;
     }
@@ -1446,24 +1449,41 @@ async claimDailyReward() {
         const receipt = await tx.wait(); // Wait for the transaction to be mined
 
         console.log("Mint successful! Transaction:", receipt.hash);
-        mintingStatusText.setText(`${itemNameFormatted} minted successfully!`);
         
-        // This is an "optimistic" update. The next step is to verify on-chain.
-        this.playerInventory.add(itemName);
-        await this.updateInventory();
+        // Find the Transfer event in the transaction receipt to get the new tokenId
+        let tokenId = null;
+        const transferEvent = receipt.logs
+            .map(log => {
+                try {
+                    // The parseLog function can throw if the log topic doesn't match the ABI
+                    return gameItemsContract.interface.parseLog(log);
+                } catch (e) {
+                    return null; // Ignore logs that don't match the contract's ABI
+                }
+            })
+            .find(event => 
+                event && 
+                event.name === 'Transfer' && 
+                event.args.to.toLowerCase() === this.account.toLowerCase()
+            );
+
+        if (transferEvent) {
+            tokenId = transferEvent.args.tokenId.toString();
+            console.log(`Parsed tokenId: ${tokenId} for item: ${itemName}`);
+            mintingStatusText.setText(`${itemNameFormatted} minted successfully!`);
+            
+            // Store the item name and its tokenId
+            this.playerInventory.set(itemName, tokenId);
+            await this.updateInventory();
+        } else {
+            console.error("Could not find a valid 'Transfer' event to parse the tokenId.");
+            mintingStatusText.setText(`Minted, but item verification failed.`);
+        }
         
         if (this.activeMintZone && this.activeMintZone.itemName === itemName) {
-            this.mintText.setText(`You already own the ${itemName.replace(/_/g, ' ')}`);
+            this.updateMintZoneText(itemName);
         }
 
-      this.playerInventory.add(itemName);
-      await this.updateInventory();
-
-      if (this.activeMintZone && this.activeMintZone.itemName === itemName) {
-        this.mintText.setText(
-          `You already own the ${itemName.replace(/_/g, " ")}`
-        );
-      }
     } catch (error) {
         console.error("Minting failed:", error);
         let errorMessage = "Minting failed. See console.";
