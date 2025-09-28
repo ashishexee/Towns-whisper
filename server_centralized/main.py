@@ -17,6 +17,7 @@ from schemas import *
 import json
 from game_logic.engine import GameEngine
 from game_logic.state_manager import GameState
+# Import our new Hedera service function
 from hedera_service import hedera_service
 from mirror_node_service import mirror_service
 # -------------------------

@@ -6,9 +6,8 @@ import "src/GameItems.sol";
 import "src/StakingManager.sol";
 import "src/TradeManager.sol";
 
-// Import for the Mock ERC20 and AccessControl errors
+// Import for the Mock ERC20
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "@openzeppelin/contracts/access/AccessControl.sol";
 
 /**
  * @title MockRuneCoin
@@ -39,7 +38,6 @@ contract GameIntegrationTest is Test {
     address public owner;
     address public player1;
     address public player2;
-    address public minter; // An account that will be granted MINTER_ROLE
 
     // --- Constants ---
     uint256 public constant STARTING_BALANCE = 1000 * 1e18;
@@ -52,7 +50,6 @@ contract GameIntegrationTest is Test {
         owner = address(this);
         player1 = vm.addr(1);
         player2 = vm.addr(2);
-        minter = vm.addr(3);
 
         // 2. Deploy Contracts
         gameItems = new GameItems();
@@ -61,9 +58,6 @@ contract GameIntegrationTest is Test {
         tradeManager = new TradeManager(address(gameItems), address(runeCoin));
 
         // 3. Setup Initial State
-        // Grant minter role to the 'minter' account
-        gameItems.grantRole(gameItems.MINTER_ROLE(), minter);
-
         // Mint a reward pool to the staking contract so it can pay rewards
         runeCoin.mint(address(stakingManager), 5000 * 1e18);
 
@@ -72,7 +66,7 @@ contract GameIntegrationTest is Test {
         runeCoin.mint(player2, STARTING_BALANCE);
 
         // Mint an initial NFT to player2 (who will be the seller in trade tests)
-        vm.prank(minter);
+        // Anyone can mint, so no need to prank a specific minter account.
         gameItems.mintItemTo(player2, "uri_sword", "Magic Sword", "A sharp sword.");
     
         // 4. Pre-approve contracts for players
@@ -90,23 +84,10 @@ contract GameIntegrationTest is Test {
     // ===================================
     //       GameItems.sol Tests
     // ===================================
-    function test_GI_MinterCanMint() public {
-        vm.prank(minter);
+    function test_GI_AnyoneCanMint() public {
+        vm.prank(player1); // Any player can mint
         uint256 newItemId = gameItems.mintItemTo(player1, "uri_shield", "Iron Shield", "A sturdy shield.");
         assertEq(gameItems.ownerOf(newItemId), player1);
-    }
-
-   function test_GI_Fail_NonMinterCannotMint() public {
-        vm.startPrank(player1); // player1 does not have MINTER_ROLE
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IAccessControl.AccessControlUnauthorizedAccount.selector,
-                player1,
-                gameItems.MINTER_ROLE()
-            )
-        );
-        gameItems.mintItemTo(player1, "uri_fail", "Fail Item", "This should not mint.");
-        vm.stopPrank();
     }
 
     // ===================================

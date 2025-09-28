@@ -1,75 +1,103 @@
 import React, { useState, useMemo } from 'react';
+import { ethers } from 'ethers';
+  //import { TokenAllowanceApproveTransaction, AccountId, TokenId } from '@hashgraph/sdk';
+// Import your centralized contract config
+import {
+  STAKING_MANAGER_ABI,
+  ERC20_ABI,
+  CONTRACT_ADDRESSES
+} from '../../contracts_eth/config.js'; // Adjust path if you moved config.js
 
-const ChallengeScreen = ({ onAccept, onDecline }) => {
+const ChallengeScreen = ({ onAccept, onDecline, walletAddress }) => {
   const [isStaking, setIsStaking] = useState(false);
+  // New states to provide feedback to the user
+  const [txStatus, setTxStatus] = useState('');
+  const [txError, setTxError] = useState('');
 
-  // State for "No Stake" mode
+  // Existing states for UI controls
   const [difficulty, setDifficulty] = useState('Easy');
   const difficulties = ["Very Easy", "Easy", "Medium", "Hard"];
-
-  // State for "Stake" mode
-  const [time, setTime] = useState(12); // in minutes
-  const MIN_TIME = 1;
-  const MAX_TIME = 20;
-  const MIN_STAKE = 0.01;
-  const MAX_STAKE = 0.1;
-
-  const [stakeAmount, setStakeAmount] = useState(MIN_STAKE);
+  const [time, setTime] = useState(12);
+  const [stakeAmount, setStakeAmount] = useState(0.01);
+  const MIN_TIME = 1, MAX_TIME = 20, MIN_STAKE = 0.01, MAX_STAKE = 0.1;
 
   const rewardAmount = useMemo(() => {
     if (!isStaking) return 0;
-    // normalizedTime is 1 for the shortest duration, 0 for the longest.
-    const normalizedTime = (MAX_TIME - time) / (MAX_TIME - MIN_TIME); 
-    const maxMultiplier = 2.5; // 2.5x reward for shortest time
-    const minMultiplier = 1.5; // 1.5x reward for longest time
-    const rewardMultiplier = minMultiplier + normalizedTime * (maxMultiplier - minMultiplier);
-    const reward = stakeAmount * rewardMultiplier;
-    return parseFloat(reward.toFixed(4));
+    const normalizedTime = (MAX_TIME - time) / (MAX_TIME - MIN_TIME);
+    const rewardMultiplier = 1.5 + normalizedTime * 1.0; // 1.5x to 2.5x
+    return parseFloat((stakeAmount * rewardMultiplier).toFixed(4));
   }, [time, stakeAmount, isStaking]);
 
-  const handleAccept = () => {
+
+
+  const handleAccept = async () => {
+    setTxStatus('');
+    setTxError('');
+
     if (isStaking) {
-      onAccept({
-        difficulty: 'Medium', // Always pass Medium for staking mode
-        isStaking: true,
-        stakeAmount: `${stakeAmount.toFixed(4)} ETH`,
-        rewardAmount: `${rewardAmount} ETH`,
-        timeLimit: `${time} minutes`,
-      });
-    } else {
-      onAccept({
-        difficulty,
-        isStaking: false,
-        stakeAmount: "0 ETH",
-        timeLimit: null, // No time limit for non-staked games
-      });
-    }
-  };
+      if (!walletAddress || typeof window.ethereum === 'undefined') {
+        setTxError("Please connect your wallet first.");
+        return;
+      }
 
-  const handleAcceptChallenge = (challengeConfig) => {
-    // In a real scenario, you would trigger a smart contract interaction here
-    // if challengeConfig.isStaking is true.
-    if (challengeConfig.isStaking) {
-      console.log(`Staking ${challengeConfig.stakeAmount} for a ${challengeConfig.difficulty} challenge.`);
-      // This is a placeholder. The actual transaction would need to resolve
-      // before the game starts.
-      alert(`Staking ${challengeConfig.stakeAmount} is a feature in development. Proceeding without an on-chain transaction for now.`);
+      try {
+        // Convert amounts to Hedera-compatible format
+        const stakeAmountInSmallestUnit = Math.floor(stakeAmount * Math.pow(10, 8)); // 8 decimals
+        const targetDurationSeconds = time * 60;
+
+        // Use Hedera SDK for approval instead of ethers
+        const provider = new ethers.BrowserProvider(window.ethereum);
+        const signer = await provider.getSigner();
+
+        // Create Hedera client using the wallet's private key (you'll need to adapt this)
+        const client = Client.forTestnet();
+        // Note: You'll need to get the user's Hedera account ID and private key
+        
+        setTxStatus("1/2: Approving token allowance via Hedera...");
+        
+        const tokenId = TokenId.fromString("0.0.6913517"); // Your token ID
+        const ownerId = AccountId.fromEvmAddress(0, 0, walletAddress);
+        const spenderId = AccountId.fromEvmAddress(0, 0, CONTRACT_ADDRESSES.stakingManager);
+
+        const approveTx = new TokenAllowanceApproveTransaction()
+          .approveTokenAllowance(tokenId, ownerId, spenderId, stakeAmountInSmallestUnit)
+          .freezeWith(client);
+
+        const approveSubmit = await approveTx.execute(client);
+        await approveSubmit.getReceipt(client);
+
+        setTxStatus("2/2: Staking tokens for the game...");
+        
+        // Now call the staking contract
+        const stakingManagerContract = new ethers.Contract(
+          CONTRACT_ADDRESSES.stakingManager, 
+          STAKING_MANAGER_ABI, 
+          signer
+        );
+        
+        const stakeTx = await stakingManagerContract.stakeForSinglePlayer(
+          stakeAmountInSmallestUnit, 
+          targetDurationSeconds
+        );
+        await stakeTx.wait();
+
+        setTxStatus("Stake successful! Starting game...");
+
+      } catch (err) {
+        console.error("Staking transaction failed:", err);
+        setTxError(err.reason || "Transaction failed. Check console.");
+        setTxStatus('');
+        return;
+      }
     }
 
-    setGameConfig({
-      difficulty: challengeConfig.difficulty, // This will now be 'Medium' for staking mode
-      isStaking: challengeConfig.isStaking,
-      stakeAmount: challengeConfig.stakeAmount,
-      timeLimit: challengeConfig.timeLimit,
-      account: walletAddress,
-      playerGender: 'Male' // Still a placeholder
-    });
-    setCurrentView('game');
-    
-    console.log("Game config set:", {
-      difficulty: challengeConfig.difficulty,
-      account: walletAddress,
-      isStaking: challengeConfig.isStaking
+    // Continue with game logic...
+    onAccept({
+      difficulty: isStaking ? 'Medium' : difficulty,
+      isStaking: isStaking,
+      stakeAmount: isStaking ? `${stakeAmount.toFixed(4)} Rune` : "0 Rune",
+      rewardAmount: isStaking ? `${rewardAmount} Rune` : "0 Rune",
+      timeLimit: isStaking ? `${time} minutes` : null,
     });
   };
 
@@ -81,7 +109,7 @@ const ChallengeScreen = ({ onAccept, onDecline }) => {
           Choose your path. Play for honor, or raise the stakes for a greater reward. The choice is yours, but the clock is always ticking.
         </p>
 
-        {/* Staking Option */}
+        {/* Staking Mode Toggle */}
         <div className="mb-8">
             <h3 className="text-2xl font-cinzel text-teal-400 mb-3">Choose Your Path</h3>
             <div className="flex justify-center gap-4">
@@ -104,21 +132,17 @@ const ChallengeScreen = ({ onAccept, onDecline }) => {
             </div>
         </div>
 
-        {/* Conditional UI based on staking choice */}
+        {/* Conditional UI */}
         {isStaking ? (
-          // STAKING UI
           <div className="animate-fade-in">
-            {/* Time Selection */}
+            {/* Time Slider */}
             <div className="mb-8">
               <h3 className="text-2xl font-cinzel text-yellow-400 mb-4">Set Your Time</h3>
               <p className="font-merriweather text-gray-400 mb-4">A shorter time limit increases your risk and potential reward multiplier.</p>
               <div className="flex items-center justify-center gap-4">
                 <span className="font-bold text-lg">{MIN_TIME} min</span>
                 <input
-                  type="range"
-                  min={MIN_TIME}
-                  max={MAX_TIME}
-                  value={time}
+                  type="range" min={MIN_TIME} max={MAX_TIME} value={time}
                   onChange={(e) => setTime(parseInt(e.target.value, 10))}
                   className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-yellow-400"
                 />
@@ -127,82 +151,68 @@ const ChallengeScreen = ({ onAccept, onDecline }) => {
               <p className="text-2xl font-bold text-white mt-3">{time} Minutes</p>
             </div>
 
-            {/* Stake Amount Selection */}
+            {/* Stake Amount Slider */}
             <div className="mb-8">
               <h3 className="text-2xl font-cinzel text-yellow-400 mb-4">Set Your Stake</h3>
-              <p className="font-merriweather text-gray-400 mb-4">Choose the amount of ETH you wish to wager.</p>
+              <p className="font-merriweather text-gray-400 mb-4">Choose the amount of Rune Coin you wish to wager.</p>
               <div className="flex items-center justify-center gap-4">
-                <span className="font-bold text-lg">{MIN_STAKE} ETH</span>
+                <span className="font-bold text-lg">{MIN_STAKE}</span>
                 <input
-                  type="range"
-                  min={MIN_STAKE}
-                  max={MAX_STAKE}
-                  step={0.001}
-                  value={stakeAmount}
+                  type="range" min={MIN_STAKE} max={MAX_STAKE} step={0.001} value={stakeAmount}
                   onChange={(e) => setStakeAmount(parseFloat(e.target.value))}
                   className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-yellow-400"
                 />
-                <span className="font-bold text-lg">{MAX_STAKE} ETH</span>
+                <span className="font-bold text-lg">{MAX_STAKE}</span>
               </div>
-              <p className="text-2xl font-bold text-white mt-3">{stakeAmount.toFixed(4)} ETH</p>
+              <p className="text-2xl font-bold text-white mt-3">{stakeAmount.toFixed(4)} Rune</p>
             </div>
 
             {/* Wager Details */}
             <div className="mb-8 p-6 bg-gray-800/50 border border-yellow-400/30 rounded-lg">
                 <h4 className="text-2xl font-cinzel text-yellow-300 mb-4">Wager Details</h4>
                 <div className="grid grid-cols-2 gap-4 text-lg font-merriweather">
-                    <div className="text-left">
-                        <p className="text-gray-400">Time Limit:</p>
-                        <p className="font-bold text-white text-xl">{time} minutes</p>
-                    </div>
-                    <div className="text-right">
-                        <p className="text-gray-400">Your Stake:</p>
-                        <p className="font-bold text-yellow-400 text-xl">{stakeAmount.toFixed(4)} ETH</p>
-                    </div>
-                    <div className="col-span-2 text-center mt-2">
-                        <p className="text-gray-400">Potential Reward:</p>
-                        <p className="font-bold text-green-400 text-xl">{rewardAmount} ETH</p>
-                    </div>
+                    <div className="text-left"><p className="text-gray-400">Time Limit:</p><p className="font-bold text-white text-xl">{time} minutes</p></div>
+                    <div className="text-right"><p className="text-gray-400">Your Stake:</p><p className="font-bold text-yellow-400 text-xl">{stakeAmount.toFixed(4)} Rune</p></div>
+                    <div className="col-span-2 text-center mt-2"><p className="text-gray-400">Potential Reward:</p><p className="font-bold text-green-400 text-xl">{rewardAmount} Rune</p></div>
                 </div>
             </div>
           </div>
         ) : (
-          // NO-STAKE UI
           <div className="mb-8 animate-fade-in">
             <h3 className="text-2xl font-cinzel text-teal-400 mb-3">Select Difficulty</h3>
             <div className="flex justify-center gap-4">
               {difficulties.map(d => (
-                <button
-                  key={d}
-                  onClick={() => setDifficulty(d)}
+                <button key={d} onClick={() => setDifficulty(d)}
                   className={`px-6 py-2 font-bold rounded-lg transition-all duration-300 ${
-                    difficulty === d
-                      ? 'bg-teal-400 text-gray-900 shadow-lg shadow-teal-400/50'
-                      : 'bg-gray-700 text-teal-200 hover:bg-gray-600'
+                    difficulty === d ? 'bg-teal-400 text-gray-900 shadow-lg shadow-teal-400/50' : 'bg-gray-700 text-teal-200 hover:bg-gray-600'
                   }`}
-                >
-                  {d}
-                </button>
+                >{d}</button>
               ))}
             </div>
           </div>
         )}
 
+        {/* Transaction Status/Error Display */}
+        <div className="h-8 my-4">
+          {txStatus && <p className="text-green-400 animate-pulse">{txStatus}</p>}
+          {txError && <p className="text-red-500">{txError}</p>}
+        </div>
+
         {/* Action Buttons */}
         <div className="flex justify-center gap-6">
           <button
             onClick={handleAccept}
-            className={`px-8 py-3 text-white font-bold rounded-full transition-all duration-300 hover:scale-105 ${
-                isStaking 
-                ? 'bg-yellow-500 hover:shadow-2xl hover:shadow-yellow-500/50' 
-                : 'bg-green-500 hover:shadow-2xl hover:shadow-green-500/50'
+            disabled={!!txStatus && !txError}
+            className={`px-8 py-3 text-white font-bold rounded-full transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed ${
+                isStaking ? 'bg-yellow-500 hover:shadow-2xl hover:shadow-yellow-500/50' : 'bg-green-500 hover:shadow-2xl hover:shadow-green-500/50'
             }`}
           >
-            {isStaking ? 'Accept & Stake' : 'Accept Challenge'}
+            {txStatus ? 'Processing...' : (isStaking ? 'Accept & Stake' : 'Accept Challenge')}
           </button>
           <button
             onClick={onDecline}
-            className="px-8 py-3 bg-red-600 text-white font-bold rounded-full transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:shadow-red-600/50"
+            disabled={!!txStatus && !txError}
+            className="px-8 py-3 bg-red-600 text-white font-bold rounded-full transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:shadow-red-600/50 disabled:opacity-50"
           >
             Decline
           </button>
