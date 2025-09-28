@@ -3,26 +3,24 @@
 
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from typing import Dict
+from typing import Dict, List
 import uuid
 import os
 import traceback
 import sys
 from dotenv import load_dotenv
 from datetime import datetime, timedelta
+from hcs_service import hcs_service
 
 # --- IMPORTS WITH HEDERA SERVICE ---
 from schemas import *
-import traceback
-import uuid
 import json
-from typing import Dict, List
 from game_logic.engine import GameEngine
 from game_logic.state_manager import GameState
 # Import our new Hedera service function
 from hedera_service import hedera_service
+from mirror_node_service import mirror_service
 # -------------------------
-import os
 
 app = FastAPI()
 
@@ -420,10 +418,322 @@ async def victory_chest(request: OpenChestRequest):
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Failed to process victory reward: {e}")
 
+# --- NEW MIRROR NODE ANALYTICS ENDPOINTS ---
+
+@app.get("/analytics/account/{account_id}")
+async def get_account_analytics(account_id: str):
+    """Get comprehensive account analytics from Mirror Node"""
+    try:
+        # Get account info and transaction history in parallel
+        account_info = await mirror_service.get_account_info(account_id)
+        token_transactions = await mirror_service.get_token_transactions(account_id)
+        
+        if not account_info:
+            raise HTTPException(status_code=404, detail="Account not found")
+        
+        # Calculate analytics
+        total_received = sum(tx['amount'] for tx in token_transactions if tx['type'] == 'received')
+        total_sent = sum(abs(tx['amount']) for tx in token_transactions if tx['type'] == 'sent')
+        transaction_count = len(token_transactions)
+        
+        # Recent activity (last 7 days)
+        week_ago = datetime.now() - timedelta(days=7)
+        recent_transactions = [
+            tx for tx in token_transactions 
+            if datetime.fromtimestamp(int(tx['timestamp']) / 1_000_000_000) > week_ago
+        ]
+        
+        return {
+            "status": "success",
+            "account_id": account_id,
+            "account_info": {
+                "balance": account_info.get("balance", {}).get("balance", 0),
+                "created_timestamp": account_info.get("created_timestamp"),
+                "auto_renew_period": account_info.get("auto_renew_period")
+            },
+            "rune_token_analytics": {
+                "total_received": total_received,
+                "total_sent": total_sent,
+                "net_balance": total_received - total_sent,
+                "transaction_count": transaction_count,
+                "recent_activity_count": len(recent_transactions)
+            },
+            "recent_transactions": token_transactions[:10]  # Last 10 transactions
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to get analytics: {e}")
+
+@app.get("/analytics/transactions/{account_id}")
+async def get_transaction_history(account_id: str, limit: int = 25):
+    """Get detailed Rune token transaction history"""
+    try:
+        transactions = await mirror_service.get_token_transactions(account_id, limit=limit)
+        
+        # Format transactions for frontend
+        formatted_transactions = []
+        for tx in transactions:
+            # Convert timestamp to readable format
+            timestamp_seconds = int(tx['timestamp']) / 1_000_000_000
+            readable_time = datetime.fromtimestamp(timestamp_seconds).isoformat()
+            
+            formatted_transactions.append({
+                "transaction_id": tx['transaction_id'],
+                "timestamp": readable_time,
+                "amount": tx['amount'],
+                "type": tx['type'],
+                "status": tx['result'],
+                "description": get_transaction_description(tx['amount'], tx['type'])
+            })
+        
+        return {
+            "status": "success",
+            "account_id": account_id,
+            "transaction_count": len(formatted_transactions),
+            "transactions": formatted_transactions
+        }
+        
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to get transaction history: {e}")
+
+@app.get("/analytics/network")
+async def get_network_analytics():
+    """Get network-wide game statistics"""
+    try:
+        network_stats = await mirror_service.get_network_stats()
+        
+        # Calculate game-specific metrics
+        current_time = datetime.now()
+        
+        # Mock game statistics (in production, store these in database)
+        game_stats = {
+            "active_players_today": len(user_login_history),
+            "total_games_played": sum(1 for user_data in user_login_history.values() 
+                                    if user_data.get('games_played', 0) > 0),
+            "total_rewards_distributed": calculate_total_rewards_distributed(),
+            "average_session_time": "25.3 minutes",  # Mock data
+            "top_performing_players": get_top_players()  # Mock data
+        }
+        
+        return {
+            "status": "success",
+            "timestamp": current_time.isoformat(),
+            "network_stats": network_stats,
+            "game_stats": game_stats,
+            "mirror_node_health": "operational"
+        }
+        
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to get network analytics: {e}")
+
+# --- HELPER FUNCTIONS FOR ANALYTICS ---
+
+def get_transaction_description(amount: int, tx_type: str) -> str:
+    """Generate human-readable transaction descriptions"""
+    if tx_type == "received":
+        if amount == 250:
+            return "Welcome Bonus - First time reward"
+        elif 50 <= amount <= 200:
+            return "Daily Login Reward"
+        elif 1000 <= amount <= 2000:
+            return "Victory Chest Reward"
+        else:
+            return f"Received {amount} Rune Tokens"
+    else:
+        return f"Sent {abs(amount)} Rune Tokens"
+
+def calculate_total_rewards_distributed() -> int:
+    """Calculate total rewards distributed (mock implementation)"""
+    # In production, query Mirror Node for all Rune token distributions
+    return sum(
+        (250 if user_data.get('welcome_bonus_claimed') else 0) +
+        (user_data.get('daily_rewards_claimed', 0) * 125) +  # Average daily reward
+        (user_data.get('victory_rewards_claimed', 0) * 1500)  # Average victory reward
+        for user_data in user_login_history.values()
+    )
+
+def get_top_players() -> list:
+    """Get top performing players (mock implementation)"""
+    # In production, query database for actual player statistics
+    return [
+        {"account_id": "0.0.123456", "score": 2500, "games_won": 15},
+        {"account_id": "0.0.789012", "score": 2200, "games_won": 12},
+        {"account_id": "0.0.345678", "score": 1800, "games_won": 9}
+    ]
+
+# --- EXISTING MULTIPLAYER ENDPOINTS ---
+
+# Add this import at the top with your other imports
+
+
+# Add these new HCS endpoints after your analytics endpoints
+
+# --- HCS CONSENSUS ENDPOINTS ---
+
+@app.post("/consensus/create-topics")
+async def create_consensus_topics():
+    """Initialize HCS topics for consensus mechanisms"""
+    try:
+        topics = await hcs_service.create_consensus_topics()
+        
+        if topics:
+            return {
+                "status": "success",
+                "message": "HCS topics created successfully",
+                "topics": topics,
+                "demo_mode": hcs_service.demo_mode
+            }
+        else:
+            raise HTTPException(status_code=500, detail="Failed to create HCS topics")
+            
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to create consensus topics: {e}")
+
+@app.post("/consensus/dialogue")
+async def submit_dialogue_consensus(request: dict):
+    """Submit LLM dialogue for consensus validation - REVOLUTIONARY FEATURE!"""
+    try:
+        required_fields = ['game_id', 'player_id', 'villager_name', 'player_input', 'llm_response']
+        for field in required_fields:
+            if field not in request:
+                raise HTTPException(status_code=400, detail=f"Missing required field: {field}")
+        
+        result = await hcs_service.submit_dialogue_for_consensus(
+            game_id=request['game_id'],
+            player_id=request['player_id'],
+            villager_name=request['villager_name'],
+            player_input=request['player_input'],
+            llm_response=request['llm_response']
+        )
+        
+        if result['status'] == 'success':
+            return {
+                "status": "success",
+                "message": "🚀 LLM dialogue submitted for consensus validation!",
+                "consensus_id": result['consensus_id'],
+                "topic_id": result.get('topic_id'),
+                "innovation": "First-ever LLM dialogue consensus in Web3 gaming",
+                "demo_mode": result.get('demo_mode', False)
+            }
+        else:
+            raise HTTPException(status_code=500, detail=result['message'])
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to submit dialogue consensus: {e}")
+
+@app.post("/consensus/victory")
+async def submit_victory_consensus(request: dict):
+    """Submit victory claim for consensus validation"""
+    try:
+        required_fields = ['game_id', 'player_id', 'victory_claim']
+        for field in required_fields:
+            if field not in request:
+                raise HTTPException(status_code=400, detail=f"Missing required field: {field}")
+        
+        result = await hcs_service.submit_victory_consensus(
+            game_id=request['game_id'],
+            player_id=request['player_id'],
+            victory_claim=request['victory_claim']
+        )
+        
+        if result['status'] == 'success':
+            return {
+                "status": "success",
+                "message": "Victory claim submitted for consensus validation",
+                "consensus_id": result['consensus_id'],
+                "topic_id": result.get('topic_id'),
+                "demo_mode": result.get('demo_mode', False)
+            }
+        else:
+            raise HTTPException(status_code=500, detail=result['message'])
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to submit victory consensus: {e}")
+
+@app.post("/consensus/game-event")
+async def submit_game_event_consensus(request: dict):
+    """Submit general game events for consensus logging"""
+    try:
+        required_fields = ['event_type', 'game_id', 'event_data']
+        for field in required_fields:
+            if field not in request:
+                raise HTTPException(status_code=400, detail=f"Missing required field: {field}")
+        
+        result = await hcs_service.submit_game_session_event(
+            event_type=request['event_type'],
+            game_id=request['game_id'],
+            event_data=request['event_data']
+        )
+        
+        if result['status'] == 'success':
+            return {
+                "status": "success",
+                "message": f"{request['event_type']} event logged to consensus",
+                "topic_id": result.get('topic_id'),
+                "demo_mode": result.get('demo_mode', False)
+            }
+        else:
+            raise HTTPException(status_code=500, detail=result['message'])
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to submit game event consensus: {e}")
+
+@app.get("/consensus/status/{consensus_id}")
+async def get_consensus_status(consensus_id: str):
+    """Get the current status of a consensus validation"""
+    try:
+        status = await hcs_service.get_consensus_status(consensus_id)
+        
+        return {
+            "status": "success",
+            "consensus_data": status,
+            "message": "Consensus status retrieved successfully"
+        }
+        
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to get consensus status: {e}")
+
+@app.get("/consensus/topics")
+async def get_consensus_topics():
+    """Get list of all HCS topics used for consensus"""
+    try:
+        return {
+            "status": "success",
+            "topics": hcs_service.topics,
+            "descriptions": {
+                "game_sessions": "Game session events and player actions",
+                "dialogue_validation": "🚀 LLM dialogue consensus validation (REVOLUTIONARY!)",
+                "victory_validation": "Victory condition consensus verification",
+                "leaderboard": "Player achievement and ranking updates"
+            },
+            "demo_mode": hcs_service.demo_mode
+        }
+        
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to get consensus topics: {e}")
+
 @app.get("/ping")
 async def ping():
     """Health check endpoint"""
     return {"message": "Server is running", "timestamp": datetime.now().isoformat()}
+
 @app.post("/create_room")
 async def create_room():
     room_id = str(uuid.uuid4())[:8]
