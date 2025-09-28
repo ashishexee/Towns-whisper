@@ -1,25 +1,21 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 /**
  * @title StakingManager
- * @dev Manages single-player and multiplayer staking for Echoes of the Village.
- * Holds staked VillageCoins and distributes them based on game outcomes reported
+ * @dev Manages single-player and multiplayer staking using the chain's native token (e.g., ETH).
+ * Holds staked tokens and distributes them based on game outcomes reported
  * by the trusted backend server (the contract owner).
  */
 contract StakingManager is Ownable, ReentrancyGuard {
 
-    // The ERC20 token contract used for staking
-    IERC20 public villageCoin;
-
     // ============== STRUCTS ==============
 
     struct SinglePlayerStake {
-        uint256 amount;         // Amount of VCOIN staked
+        uint256 amount;         // Amount of native token staked
         uint256 targetDuration; // The time in seconds the player is aiming for
         uint256 startTime;      // Timestamp when the stake was initiated
         bool isActive;          // Flag to check if a stake is currently active
@@ -50,60 +46,54 @@ contract StakingManager is Ownable, ReentrancyGuard {
 
     // ============== CONSTRUCTOR ==============
 
-    constructor(address _villageCoinAddress) Ownable(msg.sender) {
-        villageCoin = IERC20(_villageCoinAddress);
+    constructor() Ownable(msg.sender) {
         nextGameId = 1;
     }
 
     // ============== SINGLE-PLAYER FUNCTIONS ==============
 
     /**
-     * @dev Allows a player to stake VCOIN on a personal challenge.
-     * The player must have approved this contract to spend their VCOIN first.
-     * @param _amount The amount of VCOIN to stake.
+     * @dev Allows a player to stake the native token on a personal challenge.
      * @param _targetDuration The target completion time in seconds.
      */
-    function stakeForSinglePlayer(uint256 _amount, uint256 _targetDuration) external nonReentrant {
-        require(_amount > 0, "Stake amount must be greater than 0");
+    function stakeForSinglePlayer(uint256 _targetDuration) external payable nonReentrant {
+        require(msg.value > 0, "Stake amount must be greater than 0");
         require(!singlePlayerStakes[msg.sender].isActive, "Player already has an active stake");
 
-        // Transfer VCOIN from the player to this contract
-        bool success = villageCoin.transferFrom(msg.sender, address(this), _amount);
-        require(success, "ERC20 transfer failed");
+        // Native token is transferred automatically with the 'payable' call.
 
         // Create and store the stake details
         singlePlayerStakes[msg.sender] = SinglePlayerStake({
-            amount: _amount,
+            amount: msg.value,
             targetDuration: _targetDuration,
             startTime: block.timestamp,
             isActive: true
         });
 
-        emit StakeCreated(msg.sender, _amount, _targetDuration);
+        emit StakeCreated(msg.sender, msg.value, _targetDuration);
     }
 
     // ============== MULTIPLAYER FUNCTIONS ==============
 
     /**
      * @dev Creates a multiplayer game room. Called by the backend.
-     * Assumes all players have already approved this contract to spend their VCOIN.
+     * The backend is responsible for sending the total stake amount in native currency.
      * @param _players An array of player addresses in the game.
      * @param _stakeAmount The amount each player is staking.
      */
-    function createMultiplayerGame(address[] calldata _players, uint256 _stakeAmount) external onlyOwner {
+    function createMultiplayerGame(address[] calldata _players, uint256 _stakeAmount) external payable onlyOwner {
         require(_players.length > 1, "Multiplayer game requires at least 2 players");
         require(_stakeAmount > 0, "Stake amount must be greater than 0");
+        
+        uint256 totalPrizePool = _players.length * _stakeAmount;
+        require(msg.value == totalPrizePool, "Incorrect total stake amount sent");
 
         uint256 currentId = nextGameId;
-        uint256 totalPrizePool = 0;
 
-        // Collect stakes from all players
+        // Check that no player has an active single-player stake
         for (uint i = 0; i < _players.length; i++) {
             address player = _players[i];
             require(!singlePlayerStakes[player].isActive, "A player has an active single-player stake");
-            bool success = villageCoin.transferFrom(player, address(this), _stakeAmount);
-            require(success, "ERC20 transfer failed for one of the players");
-            totalPrizePool += _stakeAmount;
         }
 
         // Create and store the game details
@@ -140,7 +130,7 @@ contract StakingManager is Ownable, ReentrancyGuard {
             rewardAmount = (stake.amount * 15) / 10; // 1.5x
             playerWon = true;
         } else {
-            // Player lost, their stake is forfeited (stays in the contract for now, could go to a treasury)
+            // Player lost, their stake is forfeited (stays in the contract)
             rewardAmount = 0;
         }
 
@@ -149,7 +139,8 @@ contract StakingManager is Ownable, ReentrancyGuard {
 
         // Pay out the reward if they won
         if (rewardAmount > 0) {
-            villageCoin.transfer(_player, rewardAmount);
+            (bool success, ) = payable(_player).call{value: rewardAmount}("");
+            require(success, "Reward transfer failed");
         }
 
         emit SinglePlayerGameSettled(_player, rewardAmount, playerWon);
@@ -169,7 +160,8 @@ contract StakingManager is Ownable, ReentrancyGuard {
         game.isActive = false;
 
         // Transfer the entire prize pool to the winner
-        villageCoin.transfer(_winner, game.prizePool);
+        (bool success, ) = payable(_winner).call{value: game.prizePool}("");
+        require(success, "Prize pool transfer failed");
 
         emit MultiplayerGameSettled(_gameId, _winner, game.prizePool);
     }

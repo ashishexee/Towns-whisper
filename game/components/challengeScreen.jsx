@@ -1,16 +1,14 @@
 import React, { useState, useMemo } from 'react';
 import { ethers } from 'ethers';
-  //import { TokenAllowanceApproveTransaction, AccountId, TokenId } from '@hashgraph/sdk';
 // Import your centralized contract config
 import {
   STAKING_MANAGER_ABI,
   ERC20_ABI,
   CONTRACT_ADDRESSES
-} from '../../contracts_eth/config.js'; // Adjust path if you moved config.js
+} from '../../contracts_eth/config.js';
 
 const ChallengeScreen = ({ onAccept, onDecline, walletAddress }) => {
   const [isStaking, setIsStaking] = useState(false);
-  // New states to provide feedback to the user
   const [txStatus, setTxStatus] = useState('');
   const [txError, setTxError] = useState('');
 
@@ -24,69 +22,156 @@ const ChallengeScreen = ({ onAccept, onDecline, walletAddress }) => {
   const rewardAmount = useMemo(() => {
     if (!isStaking) return 0;
     const normalizedTime = (MAX_TIME - time) / (MAX_TIME - MIN_TIME);
-    const rewardMultiplier = 1.5 + normalizedTime * 1.0; // 1.5x to 2.5x
+    const rewardMultiplier = 1.5 + normalizedTime * 1.0;
     return parseFloat((stakeAmount * rewardMultiplier).toFixed(4));
   }, [time, stakeAmount, isStaking]);
-
-
 
   const handleAccept = async () => {
     setTxStatus('');
     setTxError('');
 
     if (isStaking) {
+      // Validation checks
+      if (!CONTRACT_ADDRESSES) {
+        setTxError("Contract configuration not found. Please check config.js");
+        return;
+      }
+
+      if (!CONTRACT_ADDRESSES.stakingManager) {
+        setTxError("Staking contract address not configured");
+        return;
+      }
+
+      if (!STAKING_MANAGER_ABI || STAKING_MANAGER_ABI.length === 0) {
+        setTxError("Staking contract ABI not found or empty");
+        return;
+      }
+
       if (!walletAddress || typeof window.ethereum === 'undefined') {
         setTxError("Please connect your wallet first.");
         return;
       }
 
       try {
-        // Convert amounts to Hedera-compatible format
-        const stakeAmountInSmallestUnit = Math.floor(stakeAmount * Math.pow(10, 8)); // 8 decimals
-        const targetDurationSeconds = time * 60;
-
-        // Use Hedera SDK for approval instead of ethers
         const provider = new ethers.BrowserProvider(window.ethereum);
         const signer = await provider.getSigner();
+        console.log(signer);
 
-        // Create Hedera client using the wallet's private key (you'll need to adapt this)
-        const client = Client.forTestnet();
-        // Note: You'll need to get the user's Hedera account ID and private key
-        
-        setTxStatus("1/2: Approving token allowance via Hedera...");
-        
-        const tokenId = TokenId.fromString("0.0.6913517"); // Your token ID
-        const ownerId = AccountId.fromEvmAddress(0, 0, walletAddress);
-        const spenderId = AccountId.fromEvmAddress(0, 0, CONTRACT_ADDRESSES.stakingManager);
+        console.log('Contract Address:', CONTRACT_ADDRESSES.stakingManager);
+        console.log('ABI length:', STAKING_MANAGER_ABI.length);
 
-        const approveTx = new TokenAllowanceApproveTransaction()
-          .approveTokenAllowance(tokenId, ownerId, spenderId, stakeAmountInSmallestUnit)
-          .freezeWith(client);
+        // Check if contract exists at this address
+        const contractCode = await provider.getCode(CONTRACT_ADDRESSES.stakingManager);
+        if (contractCode === '0x') {
+          setTxError("No contract found at the specified address. Make sure the contract is deployed.");
+          return;
+        }
 
-        const approveSubmit = await approveTx.execute(client);
-        await approveSubmit.getReceipt(client);
+        const stakeAmountInWei = ethers.parseEther(stakeAmount.toString());
+        const targetDurationSeconds = time * 60;
 
-        setTxStatus("2/2: Staking tokens for the game...");
-        
-        // Now call the staking contract
+        console.log('Stake Amount (Wei):', stakeAmountInWei.toString());
+        console.log('Duration (seconds):', targetDurationSeconds);
+
         const stakingManagerContract = new ethers.Contract(
-          CONTRACT_ADDRESSES.stakingManager, 
-          STAKING_MANAGER_ABI, 
+          CONTRACT_ADDRESSES.stakingManager,
+          STAKING_MANAGER_ABI,
           signer
         );
-        
-        const stakeTx = await stakingManagerContract.stakeForSinglePlayer(
-          stakeAmountInSmallestUnit, 
-          targetDurationSeconds
-        );
-        await stakeTx.wait();
 
-        setTxStatus("Stake successful! Starting game...");
+        setTxStatus("Preparing transaction...");
+
+        // Check account balance first
+        const balance = await provider.getBalance(await signer.getAddress());
+        console.log('Account balance:', ethers.formatEther(balance), 'ETH');
+        
+        if (balance < stakeAmountInWei) {
+          setTxError(`Insufficient balance. Required: ${ethers.formatEther(stakeAmountInWei)} ETH, Available: ${ethers.formatEther(balance)} ETH`);
+          setTxStatus('');
+          return;
+        }
+
+        try {
+          setTxStatus("Executing transaction...");
+          
+          // Execute the transaction directly with error handling
+          const stakeTx = await stakingManagerContract.stakeForSinglePlayer(
+            targetDurationSeconds,
+            { 
+              value: stakeAmountInWei,
+              gasLimit: 500000 // Use a fixed high gas limit to avoid estimation failures
+            }
+          );
+          
+          setTxStatus("Transaction sent, waiting for confirmation...");
+          const receipt = await stakeTx.wait();
+          
+          console.log('Transaction receipt:', receipt);
+          setTxStatus("Stake successful! Starting game...");
+        } catch (txError) {
+          // Handle transaction errors
+          console.error('Transaction failed:', txError);
+          
+          let errorMessage = "Transaction failed";
+          
+          if (txError.reason) {
+            errorMessage = `Contract error: ${txError.reason}`;
+          } else if (txError.message) {
+            if (txError.message.includes('execution reverted')) {
+              errorMessage = "Contract rejected the transaction. Check your inputs.";
+            } else if (txError.message.includes('insufficient funds')) {
+              errorMessage = "Insufficient funds for transaction + gas";
+            } else {
+              errorMessage = txError.message;
+            }
+          }
+          
+          setTxError(errorMessage);
+          setTxStatus('');
+          
+          // Instead of returning, show error but continue with no-stake mode
+          console.log("Proceeding with game without stake due to transaction failure");
+          onAccept({
+            difficulty: difficulty,
+            isStaking: false, // Fall back to no-stake mode
+            stakeAmount: "0 Rune",
+            rewardAmount: "0 Rune",
+            timeLimit: null,
+          });
+          return;
+        }
 
       } catch (err) {
         console.error("Staking transaction failed:", err);
-        setTxError(err.reason || "Transaction failed. Check console.");
+        
+        let errorMessage = "Transaction failed";
+        
+        if (err.code === 'CALL_EXCEPTION') {
+          errorMessage = "Contract call failed. The function may not exist or requirements are not met.";
+        } else if (err.reason) {
+          errorMessage = err.reason;
+        } else if (err.message) {
+          if (err.message.includes('user rejected')) {
+            errorMessage = "Transaction was rejected by user";
+          } else if (err.message.includes('insufficient funds')) {
+            errorMessage = "Insufficient funds for transaction";
+          } else {
+            errorMessage = err.message;
+          }
+        }
+        
+        setTxError(errorMessage);
         setTxStatus('');
+        
+        // Instead of returning, show error but continue with no-stake mode
+        console.log("Proceeding with game without stake due to transaction failure");
+        onAccept({
+          difficulty: difficulty,
+          isStaking: false, // Fall back to no-stake mode
+          stakeAmount: "0 Rune",
+          rewardAmount: "0 Rune",
+          timeLimit: null,
+        });
         return;
       }
     }
@@ -109,6 +194,13 @@ const ChallengeScreen = ({ onAccept, onDecline, walletAddress }) => {
           Choose your path. Play for honor, or raise the stakes for a greater reward. The choice is yours, but the clock is always ticking.
         </p>
 
+        {/* Configuration Status */}
+        {(!CONTRACT_ADDRESSES || !CONTRACT_ADDRESSES.stakingManager || !STAKING_MANAGER_ABI) && (
+          <div className="mb-4 p-4 bg-red-900/50 border border-red-500 rounded-lg">
+            <p className="text-red-300">⚠️ Contract configuration issue detected. Staking may not work.</p>
+          </div>
+        )}
+
         {/* Staking Mode Toggle */}
         <div className="mb-8">
             <h3 className="text-2xl font-cinzel text-teal-400 mb-3">Choose Your Path</h3>
@@ -123,7 +215,8 @@ const ChallengeScreen = ({ onAccept, onDecline, walletAddress }) => {
                 </button>
                 <button
                     onClick={() => setIsStaking(true)}
-                    className={`px-6 py-2 w-40 font-bold rounded-lg transition-all duration-300 ${
+                    disabled={!CONTRACT_ADDRESSES || !CONTRACT_ADDRESSES.stakingManager || !STAKING_MANAGER_ABI}
+                    className={`px-6 py-2 w-40 font-bold rounded-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed ${
                         isStaking ? 'bg-yellow-400 text-gray-900 shadow-lg shadow-yellow-400/50' : 'bg-gray-700 text-yellow-200 hover:bg-gray-600'
                     }`}
                 >
