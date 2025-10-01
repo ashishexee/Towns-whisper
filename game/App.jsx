@@ -11,10 +11,7 @@ import ChallengeScreen from './components/challengeScreen';
 import UserRegistration from './components/UserRegistration';
 import { UserRegistryService } from './utils/userRegistry';
 import RoomLobby from './components/RoomLobby';
-import { MultiplayerScene } from './scenes/MultiplayerScene';
 
-// --- 1. IMPORT THE NEW COMPONENT AND API FUNCTION ---
-import RewardChest from './components/RewardChest';
 import { openRewardChest } from './api';
 
 function App() {
@@ -178,10 +175,10 @@ function App() {
   };
 
   const handleAcceptChallenge = (challengeConfig) => {
-    if (challengeConfig.isStaking) {
-      console.log(`Staking ${challengeConfig.stakeAmount} for a ${challengeConfig.difficulty} challenge.`);
-      alert(`Staking ${challengeConfig.stakeAmount} is a feature in development. Proceeding without an on-chain transaction for now.`);
-    }
+    // if (challengeConfig.isStaking) {
+    //   console.log(`Staking ${challengeConfig.stakeAmount} for a ${challengeConfig.difficulty} challenge.`);
+    //   alert(`Staking ${challengeConfig.stakeAmount} is a feature in development. Proceeding without an on-chain transaction for now.`);
+    // }
 
     setGameConfig({
       difficulty: challengeConfig.difficulty,

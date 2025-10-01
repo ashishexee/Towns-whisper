@@ -451,7 +451,6 @@ async claimDailyReward() {
       await this.updateInventory();
     }
 
-    // Move the frame creation to after camera setup
     const framePadding = 25;
     const extraBottomSpace = 110;
     const frameWidth = this.cameras.main.width - framePadding * 2;
@@ -459,7 +458,17 @@ async claimDailyReward() {
       this.cameras.main.height - framePadding * 2 - extraBottomSpace;
     const cornerRadius = 30;
 
-    // Create frame that follows the camera
+    const maskShape = this.make.graphics();
+    maskShape.fillStyle(0xffff00);
+    maskShape.fillRoundedRect(
+      framePadding,
+      framePadding,
+      frameWidth,
+      frameHeight,
+      cornerRadius
+    );
+    this.cameras.main.setMask(maskShape.createGeometryMask());
+
     const frame = this.add.graphics();
     frame.lineStyle(10, 0xd4af37, 1);
     frame.strokeRoundedRect(
@@ -470,23 +479,7 @@ async claimDailyReward() {
       cornerRadius
     );
     frame.setDepth(100);
-    frame.setScrollFactor(0); // Make frame stay fixed to camera
-
-    // Optional: Create a subtle vignette effect that follows camera
-    const vignette = this.add.graphics();
-    vignette.fillGradientStyle(
-      0x000000,
-      0x000000,
-      0x000000,
-      0x000000,
-      0.3,
-      0,
-      0,
-      0.3
-    );
-    vignette.fillRect(0, 0, this.cameras.main.width, this.cameras.main.height);
-    vignette.setDepth(99);
-    vignette.setScrollFactor(0);
+    frame.setScrollFactor(0);
 
     if (
       !this.sound.get("background_music") ||
@@ -803,7 +796,7 @@ async claimDailyReward() {
     this.cameras.main.startFollow(this.player);
     this.cameras.main.setFollowOffset(0, 0);
     this.cameras.main.setLerp(0.1, 0.1); // Smooth camera following
-    this.cameras.main.setZoom(2.5); // Zoom in for better view
+    // this.cameras.main.setZoom(1.5); // Zoom in for better view
 
     // Set world bounds so camera doesn't go outside the game world
     const worldWidth =
