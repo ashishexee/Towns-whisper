@@ -5,7 +5,6 @@ export class VideoScene extends Phaser.Scene {
         super({ key: 'VideoScene' });
         this.playerGender = 'Male';
         this.account = null;
-        // this.chainClient = null; // PREVIOUS CHAIN INTEGRATION REMOVED
         this.dialogues = [];
         this.currentTypingEvent = null;
         this.dataToPass = {};
@@ -14,7 +13,6 @@ export class VideoScene extends Phaser.Scene {
     init(data) {
         this.playerGender = data ? data.playerGender : 'Male';
         this.account = data ? data.account : null;
-        // this.chainClient = data ? data.chainClient : null; // PREVIOUS CHAIN INTEGRATION REMOVED
         this.dataToPass = data;
     }
 
@@ -120,12 +118,10 @@ export class VideoScene extends Phaser.Scene {
     }
 
     startHomeScene() {
-        // Stop any active speech
         window.speechSynthesis.cancel();
         this.scene.start('HomeScene', { 
             playerGender: this.playerGender,
             account: this.account,
-            // chainClient: this.chainClient, // PREVIOUS CHAIN INTEGRATION REMOVED
             difficulty: this.dataToPass.difficulty
         });
     }
@@ -162,22 +158,17 @@ export class VideoScene extends Phaser.Scene {
         }).setOrigin(0.5).setInteractive({ useHandCursor: true }).setDepth(200);
 
         const cleanupAndGoHome = () => {
-    // Stop any active speech
     window.speechSynthesis.cancel();
 
-    // **THIS IS THE KEY FIX**
-    // If a typing timer is active, stop it
     if (this.currentTypingEvent) {
         this.currentTypingEvent.remove(false);
         this.currentTypingEvent = null;
     }
 
-    // Destroy the UI elements
     if (skipButton && skipButton.destroy) skipButton.destroy();
     if (dialogueText && dialogueText.destroy) dialogueText.destroy();
     if (speakerText && speakerText.destroy) speakerText.destroy();
 
-    // Transition to the next scene
     this.startHomeScene();
 };
 
@@ -209,12 +200,10 @@ export class VideoScene extends Phaser.Scene {
     let i = 0;
     target.setText('');
 
-    // If a timer is already running, stop it first
     if (this.currentTypingEvent) {
         this.currentTypingEvent.remove();
     }
 
-    // Store the new timer event in the scene property
     this.currentTypingEvent = this.time.addEvent({
         delay: 60,
         loop: true,
@@ -224,7 +213,6 @@ export class VideoScene extends Phaser.Scene {
                 i++;
                 return;
             }
-            // When done, remove the event and clear the property
             this.currentTypingEvent.remove(false);
             this.currentTypingEvent = null;
             if (onComplete) this.time.delayedCall(100, onComplete, [], this);

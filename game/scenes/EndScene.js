@@ -30,7 +30,6 @@ export class EndScene extends Phaser.Scene {
         }).setOrigin(0.5);
         if (this.endGameData.isCorrect) {
            console.log("Player won! Dispatching gameWon event.");
-           // This is the "shout" to the React UI
            window.dispatchEvent(new CustomEvent('gameWon'));
 }
 
@@ -73,7 +72,6 @@ export class EndScene extends Phaser.Scene {
             .on('pointerover', () => mainMenuButton.setStyle({ fill: '#4aff9f' }))
             .on('pointerout', () => mainMenuButton.setStyle({ fill: '#2ecc71' }));
 
-        // Add a text element to show the submission status
         this.submissionStatusText = this.add.text(centerX, centerY + 270, '', {
             fontFamily: 'Arial',
             fontSize: '18px',

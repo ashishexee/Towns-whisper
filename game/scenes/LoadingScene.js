@@ -136,7 +136,6 @@ export class LoadingScene extends Phaser.Scene {
       });
     });
 
-    // Load player directional sprites
     this.load.image('player_up', 'assets/images/characters/mc.png');
     this.load.image('player_down', 'assets/images/characters/mc.png');
     this.load.image('player_left', 'assets/images/characters/leftmc.png');
