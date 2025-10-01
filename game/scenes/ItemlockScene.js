@@ -23,19 +23,16 @@ export class ItemLockScene extends Phaser.Scene {
     console.log(`Called from scene: ${this.callingScene}`);
   }
   create() {
-    // Make sure we're on top of other scenes
     this.scene.bringToTop();
 
     const width = this.cameras.main.width;
     const height = this.cameras.main.height;
 
-    // Add a semi-transparent background
     this.add
       .rectangle(0, 0, width, height, 0x000000, 0.7)
       .setOrigin(0)
       .setDepth(10);
 
-    // Create panel
     const panelWidth = 400;
     const panelHeight = 250;
     const panelX = width / 2 - panelWidth / 2;
@@ -47,7 +44,6 @@ export class ItemLockScene extends Phaser.Scene {
       .setStrokeStyle(4, 0xd4af37)
       .setDepth(11);
 
-    // Add lock icon
     const lockIcon = this.add
       .text(width / 2, panelY + 50, "🔒", {
         fontSize: "48px",
@@ -55,7 +51,6 @@ export class ItemLockScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setDepth(12);
 
-    // Add title text
     const titleText = this.add
       .text(width / 2, panelY + 110, "This villager requires an item", {
         fontSize: "22px",
@@ -66,7 +61,6 @@ export class ItemLockScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setDepth(12);
 
-    // Add required item text
     const itemDisplayName = this.villager.requiredItem.replace(/_/g, " ");
     const itemText = this.add
       .text(width / 2, panelY + 140, `Required: ${itemDisplayName}`, {
@@ -78,7 +72,6 @@ export class ItemLockScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setDepth(12);
 
-    // Add status text
     this.statusText = this.add
       .text(width / 2, panelY + 170, "Do you want to use this item?", {
         fontSize: "18px",
@@ -89,12 +82,10 @@ export class ItemLockScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setDepth(12);
 
-    // Add buttons
     const buttonWidth = 150;
     const buttonHeight = 40;
     const padding = 20;
 
-    // Continue button (if player has the item)
     this.tradeButton = this.add
       .rectangle(
         width / 2 - buttonWidth - padding / 2,
@@ -116,10 +107,9 @@ export class ItemLockScene extends Phaser.Scene {
       .setDepth(13);
 
     this.tradeButton.on("pointerdown", () => {
-      this.tradeAndBurnItem();
+      this.tradeInItem();
     });
 
-    // Cancel button
     const cancelButton = this.add
       .rectangle(
         width / 2 + padding / 2 + buttonWidth / 2,
@@ -144,11 +134,10 @@ export class ItemLockScene extends Phaser.Scene {
       this.closeScene();
     });
 
-    // Debug info - Display calling scene name
     console.log("ItemLockScene is active, called from:", this.callingScene);
   }
 
-  async tradeAndBurnItem() {
+  async tradeInItem() {
     console.log(`Attempting to use item ${this.villager.requiredItem}`);
     if (!this.account) {
       this.statusText.setText("Wallet is not connected.");
@@ -184,7 +173,7 @@ export class ItemLockScene extends Phaser.Scene {
           `Error: Could not find a valid Token ID for ${itemNameFormatted}.`
         );
         console.error(
-          `Token ID for ${itemName} is null or undefined. Cannot burn.`
+          `Token ID for ${itemName} is null or undefined. Cannot trade in.`
         );
         this.tradeButton.setInteractive().setAlpha(1);
         return;
@@ -202,24 +191,20 @@ export class ItemLockScene extends Phaser.Scene {
 
       this.statusText.setText("Please confirm in your wallet...");
 
-      // Assuming a standard ERC721 burn function that takes the tokenId
-      const tx = await gameItemsContract.burn(tokenId);
+      const tx = await gameItemsContract.tradeInItem(tokenId);
 
       this.statusText.setText("Transaction sent. Waiting for confirmation...");
       const receipt = await tx.wait();
 
-      console.log("Burn successful! Transaction:", receipt.hash);
+      console.log("Trade-in successful! Transaction:", receipt.hash);
       this.statusText.setText(`${itemNameFormatted} has been traded!`);
 
-      // Update inventory in the calling scene
       callingScene.playerInventory.delete(itemName);
 
-      // Emit event to unlock the villager
       callingScene.events.emit("villagerUnlocked", this.villager.name);
 
       this.time.delayedCall(2000, () => {
-        this.scene.stop();
-        callingScene.scene.resume();
+        this.closeScene();
       });
     } catch (error) {
       console.error("Trade/burn item failed:", error);

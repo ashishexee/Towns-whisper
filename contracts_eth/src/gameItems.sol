@@ -2,10 +2,12 @@
 pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
-/// @notice ERC721 collectible used by the game. Players can mint items and burn them.
-contract GameItems is ERC721URIStorage {
+/// @notice ERC721 collectible used by the game. Players can mint items and trade them in.
+contract GameItems is ERC721URIStorage, Ownable {
     uint256 private _nextId;
+    address public treasuryAddress;
 
     struct Item {
         string name;
@@ -14,10 +16,17 @@ contract GameItems is ERC721URIStorage {
     mapping(uint256 => Item) public items;
 
     event ItemMinted(address indexed to, uint256 indexed id, string name);
-    event ItemBurned(uint256 indexed id);
+    event ItemTradedIn(uint256 indexed id, address indexed from, address indexed to);
 
-    constructor() ERC721("EchoesItem", "EITEM") {
-        // No roles needed, minting is open as per game design
+    constructor() ERC721("EchoesItem", "EITEM") Ownable(msg.sender) {
+        treasuryAddress = 0x9E3639F2fAbE9Cb99879b479E57c45202060B0C9; // Default treasury to the deployer
+        _nextId = 1;
+    }
+
+    /// @notice Sets the address of the treasury that receives traded-in items.
+    function setTreasuryAddress(address _treasury) external onlyOwner {
+        require(_treasury != address(0), "Treasury address cannot be the zero address");
+        treasuryAddress = _treasury;
     }
 
     /// @notice Mint an item to an address. Anyone can call this function.
@@ -27,8 +36,9 @@ contract GameItems is ERC721URIStorage {
         string memory name_,
         string memory description_
     ) external returns (uint256) {
-        _nextId++;
+        require(to != address(0), "Cannot mint to the zero address");
         uint256 id = _nextId;
+        _nextId++;
         _safeMint(to, id);
         if (bytes(tokenURI).length > 0) {
             _setTokenURI(id, tokenURI);
@@ -38,16 +48,14 @@ contract GameItems is ERC721URIStorage {
         return id;
     }
 
-    /// @notice Burns an item. Can only be called by the item's owner or an approved address.
+    /// @notice Trades in an item to the game's treasury. Can only be called by the item's owner or an approved address.
     /// @dev This is used in-game when a player uses an item to unlock a villager.
-    function burn(uint256 tokenId) external {
-        require(
-            _isAuthorized(ownerOf(tokenId), _msgSender(), tokenId),
-            "ERC721: Caller is not owner or approved"
-        );
-        _burn(tokenId);
+    function tradeInItem(uint256 tokenId) external {
+        address from = ownerOf(tokenId);
+        // safeTransferFrom already checks if the caller is the owner or is approved.
+        safeTransferFrom(from, treasuryAddress, tokenId);
         delete items[tokenId];
-        emit ItemBurned(tokenId);
+        emit ItemTradedIn(tokenId, from, treasuryAddress);
     }
 
     function getItem(
@@ -60,7 +68,4 @@ contract GameItems is ERC721URIStorage {
         Item storage it = items[tokenId];
         return (it.name, it.description, ownerOf(tokenId), tokenURI(tokenId));
     }
-
-    // The supportsInterface override is no longer needed as the conflict is resolved
-    // by removing AccessControl.
 }

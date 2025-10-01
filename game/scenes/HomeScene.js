@@ -22,7 +22,6 @@ export class HomeScene extends Phaser.Scene {
     this.resetTimer = null;
     this.initialPlayerPos = { x: 1, y: 4.5 };
     this.resetFeedbackText = null;
-    // this.chainClient = null; // PREVIOUS CHAIN INTEGRATION REMOVED
     this.account = null;
     this.playerInventory = new Map();
     this.mintKey = null;
@@ -41,12 +40,10 @@ export class HomeScene extends Phaser.Scene {
       this.gameData = data.existingGameData;
       console.log("Existing game data loaded:", this.gameData);
     }
-    // this.chainClient = data ? data.chainClient : null; // PREVIOUS CHAIN INTEGRATION REMOVED
     this.account = data ? data.account : null;
     this.difficulty = data ? data.difficulty || "Easy" : "Easy";
   }
   createTokenBalanceUI() {
-    // Create DOM element for token balance overlay
     this.tokenBalanceElement = document.createElement('div');
     this.tokenBalanceElement.style.cssText = `
         position: fixed;
@@ -76,10 +73,8 @@ export class HomeScene extends Phaser.Scene {
     
     document.body.appendChild(this.tokenBalanceElement);
     
-    // Add event listeners
     document.getElementById('refresh-btn').onclick = () => this.updateTokenBalance();
     
-    // Initial balance fetch
     this.updateTokenBalance();
 }
 async updateTokenBalance() {
@@ -101,7 +96,6 @@ updateChestButtons() {
     const chestContainer = document.getElementById('chest-buttons');
     if (!chestContainer) return;
     
-    // Check eligibility (simplified)
     const lastWelcome = localStorage.getItem(`welcome_${this.account}`);
     const lastDaily = localStorage.getItem(`daily_${this.account}`);
     const now = Date.now();
@@ -165,34 +159,27 @@ async claimDailyReward() {
 
   async create() {
     this.startTime = this.time.now;
-    // Create loading UI matching LoadingScene style
     const width = this.cameras.main.width;
     const height = this.cameras.main.height;
     this.createTokenBalanceUI();
-    // Add background overlay
     const overlay = this.add
       .rectangle(0, 0, width, height, 0x000000, 0.9)
       .setOrigin(0)
       .setDepth(200);
 
-    // Create main loading panel with better styling
     const panelWidth = 600;
     const panelHeight = 300;
     const panelX = width / 2 - panelWidth / 2;
     const panelY = height / 2 - panelHeight / 2;
 
-    // Create graphics for the panel with gradient effect
     const loadingPanel = this.add.graphics().setDepth(201);
 
-    // Main panel background
     loadingPanel.fillStyle(0x1a1a2e, 0.95);
     loadingPanel.fillRoundedRect(panelX, panelY, panelWidth, panelHeight, 25);
 
-    // Golden border
     loadingPanel.lineStyle(4, 0xd4af37, 1);
     loadingPanel.strokeRoundedRect(panelX, panelY, panelWidth, panelHeight, 25);
 
-    // Inner glow effect
     loadingPanel.lineStyle(2, 0xffd700, 0.6);
     loadingPanel.strokeRoundedRect(
       panelX + 2,
@@ -202,7 +189,6 @@ async claimDailyReward() {
       23
     );
 
-    // Game title
     const gameTitle = this.add
       .text(width / 2, panelY + 60, "Towns Whisper", {
         fontFamily: "Georgia, serif",
@@ -214,7 +200,6 @@ async claimDailyReward() {
       .setOrigin(0.5)
       .setDepth(202);
 
-    // Loading subtitle
     const loadingSubtitle = this.add
       .text(width / 2, panelY + 100, "Creating a New Mystery...", {
         fontFamily: "Arial",
@@ -225,13 +210,11 @@ async claimDailyReward() {
       .setOrigin(0.5)
       .setDepth(202);
 
-    // Progress bar setup with better styling
     const progressBarWidth = 450;
     const progressBarHeight = 25;
     const progressBarX = width / 2 - progressBarWidth / 2;
     const progressBarY = panelY + 160;
 
-    // Progress bar background
     const progressBox = this.add.graphics().setDepth(202);
     progressBox.fillStyle(0x2c2c54, 0.8);
     progressBox.fillRoundedRect(
@@ -252,7 +235,6 @@ async claimDailyReward() {
 
     const progressBar = this.add.graphics().setDepth(203);
 
-    // Percentage text
     const percentText = this.add
       .text(width / 2, progressBarY + progressBarHeight / 2, "0%", {
         fontFamily: "Arial",
@@ -263,7 +245,6 @@ async claimDailyReward() {
       .setOrigin(0.5)
       .setDepth(204);
 
-    // Status text
     const statusText = this.add
       .text(width / 2, panelY + 220, "Initializing...", {
         fontFamily: "Arial",
@@ -274,7 +255,6 @@ async claimDailyReward() {
       .setOrigin(0.5)
       .setDepth(202);
 
-    // Loading dots animation
     const loadingDots = this.add
       .text(width / 2, panelY + 250, "", {
         fontFamily: "Arial",
@@ -294,18 +274,15 @@ async claimDailyReward() {
       loop: true,
     });
 
-    // Extended progress bar animation (3 seconds instead of 2)
     let progress = 0;
     const progressTimer = this.time.addEvent({
-      delay: 50, // Smoother animation with smaller intervals
+      delay: 50,
       callback: () => {
-        progress += 0.005; // Slower increment for 3-second duration
+        progress += 0.005;
         if (progress > 1) progress = 1;
 
-        // Create gradient progress bar
         progressBar.clear();
 
-        // Main progress bar with gradient effect
         progressBar.fillGradientStyle(
           0x4caf50,
           0x2e7d32,
@@ -323,7 +300,6 @@ async claimDailyReward() {
           10
         );
 
-        // Add shine effect
         if (progress > 0.1) {
           progressBar.fillStyle(0xffffff, 0.3);
           progressBar.fillRoundedRect(
@@ -337,7 +313,6 @@ async claimDailyReward() {
 
         percentText.setText(Math.floor(progress * 100) + "%");
 
-        // Update status text based on progress with more stages
         if (progress < 0.2) {
           statusText.setText("Connecting to server...");
         } else if (progress < 0.4) {
@@ -361,11 +336,9 @@ async claimDailyReward() {
       this.difficulty
     );
 
-    // Complete the progress bar with final animation
     progressTimer.destroy();
     dotsTimer.destroy();
 
-    // Set progress to 100% immediately instead of animating
     progress = 1;
     progressBar.clear();
     progressBar.fillGradientStyle(0x4caf50, 0x2e7d32, 0x81c784, 0x66bb6a, 1);
@@ -379,7 +352,6 @@ async claimDailyReward() {
       10
     );
 
-    // Shine effect
     progressBar.fillStyle(0xffffff, 0.3);
     progressBar.fillRoundedRect(
       progressBarX + padding,
@@ -394,7 +366,6 @@ async claimDailyReward() {
     loadingDots.setText("✓");
     loadingDots.setStyle({ color: "#4CAF50", fontSize: "32px" });
 
-    // Clean up loading UI with fade out effect
     this.time.delayedCall(800, () => {
       this.tweens.add({
         targets: [
@@ -438,7 +409,6 @@ async claimDailyReward() {
     this.gameData = { game_id, inaccessible_locations, villagers };
     console.log("Game data initialized:", this.gameData);
 
-    // Set up event listener for ItemLockScene
     this.events.on("villagerUnlocked", this.unlockVillager, this);
 
     if (this.scene.get("ItemLockScene")) {
@@ -447,7 +417,7 @@ async claimDailyReward() {
         .events.on("villagerUnlocked", this.unlockVillager, this);
     }
 
-    if (this.account && this.suiClient) {
+    if (this.account) {
       await this.updateInventory();
     }
 
@@ -491,7 +461,6 @@ async claimDailyReward() {
     if (!this.scene.isActive("UIScene")) {
       this.scene.launch("UIScene", {
         account: this.account,
-        // chainClient: this.chainClient, // PREVIOUS CHAIN INTEGRATION REMOVED
         inaccessibleLocations: this.gameData.inaccessible_locations,
         difficulty: this.difficulty,
       });
@@ -505,10 +474,10 @@ async claimDailyReward() {
 
     for (let y = 0; y < tilesY; y++) {
       this.walkableGrid[y] = [];
-      this.occupiedGrid[y] = []; // Initialize occupied grid
+      this.occupiedGrid[y] = [];
       for (let x = 0; x < tilesX; x++) {
         this.walkableGrid[y][x] = false;
-        this.occupiedGrid[y][x] = false; // All tiles are initially unoccupied
+        this.occupiedGrid[y][x] = false;
         this.add
           .image(x * this.tileSize, y * this.tileSize, "background")
           .setOrigin(0)
@@ -596,7 +565,6 @@ async claimDailyReward() {
       }
     }
 
-    // Buildings
     this.createObstacle(0.5, 0.7, "house01", 4, 4);
     this.createObstacle(5.5, 13.7, "house01", 5, 5);
     this.createObstacle(14, 0.8, "house01", 4.5, 4.5);
@@ -624,7 +592,6 @@ async claimDailyReward() {
     this.createObstacle(5.5, 10.6, "lake01", 5, 4.5);
     this.createObstacle(26.5, 15.4, "lake01", 7, 7);
 
-    // Trees
     this.createObstacle(5.3, 6.5, "tree01", 4, 4);
     this.createObstacle(6.8, 6.5, "tree01", 4, 4);
     this.createObstacle(8.3, 6.5, "tree01", 4, 4);
@@ -639,11 +606,9 @@ async claimDailyReward() {
     this.createObstacle(33.5, 3, "tree05", 2, 3);
     this.createObstacle(35.5, 8, "tree01", 4, 4);
 
-    //Farmhouse
     this.createObstacle(41.3, 0.7, "farmhouse", 3, 3);
     this.createObstacle(44, 0.7, "farmhouse", 3, 3);
 
-    //Crops
     this.createObstacle(12.2, 16, "crop02", 2.5, 2);
     this.createObstacle(12.2, 18.3, "crop03", 2.5, 2);
     this.createObstacle(18.2, 18.3, "crop03", 2.5, 2);
@@ -672,7 +637,6 @@ async claimDailyReward() {
     this.createObstacle(44.5, 11.6, "crop03", 2, 2);
     this.createObstacle(44.5, 13.6, "crop02", 2, 2);
 
-    // Forests
     this.createObstacle(19.85, 3.2, "house01", 4.5, 4.5);
 
     this.createObstacle(18.1, 3.4, "crop03", 2, 2);
@@ -683,7 +647,6 @@ async claimDailyReward() {
     this.createObstacle(20.15, 1.2, "crop03", 2, 2);
     this.createObstacle(22.15, 1.2, "crop02", 2, 2);
     this.createObstacle(24.15, 1.2, "crop03", 2, 2);
-    // Randomly place flowers on green spaces
     const flowerTypes = ["flower01", "flower02", "flower03"];
     const greenSpaces = [];
     for (let y = 0; y < tilesY; y++) {
@@ -694,7 +657,7 @@ async claimDailyReward() {
       }
     }
 
-    const numberOfFlowers = 50; // Adjust this number as needed
+    const numberOfFlowers = 50;
     for (let i = 0; i < numberOfFlowers; i++) {
       if (greenSpaces.length > 0) {
         const randomIndex = Phaser.Math.Between(0, greenSpaces.length - 1);
@@ -704,10 +667,8 @@ async claimDailyReward() {
       }
     }
 
-    // --- Villagers Setup ---
     this.villagers = this.physics.add.group({ immovable: true });
 
-    // --- New Dynamic Item Logic ---
     const ALL_POSSIBLE_ITEMS = [
       "FISHING_ROD",
       "AXE",
@@ -749,11 +710,10 @@ async claimDailyReward() {
       villager_7: { tileX: 26.2, tileY: 5, texture: "villager04", scale: 0.06 },
     };
 
-    // Assign required_item only among villagers that will be rendered.
     (function assignLocks(gameData, spriteMap, unlockItems) {
       const availableIds = gameData.villagers
         .map((v) => v.id)
-        .filter((id) => !!spriteMap[id]); // only those with sprites
+        .filter((id) => !!spriteMap[id]);
 
       Phaser.Utils.Array.Shuffle(availableIds);
 
@@ -792,13 +752,10 @@ async claimDailyReward() {
 
     this.createPlayer(1, 4.5);
 
-    // Add camera follow configuration
     this.cameras.main.startFollow(this.player);
     this.cameras.main.setFollowOffset(0, 0);
-    this.cameras.main.setLerp(0.1, 0.1); // Smooth camera following
-    // this.cameras.main.setZoom(1.5); // Zoom in for better view
+    this.cameras.main.setLerp(0.1, 0.1);
 
-    // Set world bounds so camera doesn't go outside the game world
     const worldWidth =
       Math.ceil(this.cameras.main.width / this.tileSize) * this.tileSize;
     const worldHeight =
@@ -823,7 +780,6 @@ async claimDailyReward() {
       .setDepth(30)
       .setVisible(false);
 
-    // --- New Minting Setup ---
     this.mintKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.M);
     this.mintText = this.add
       .text(0, 0, "Press M to mint", {
@@ -843,16 +799,15 @@ async claimDailyReward() {
       }
     });
 
-    // --- Dynamic Minting Zone Creation ---
     const ALL_MINT_ZONES = {
-      FISHING_ROD: { x: 6, y: 10, width: 80, height: 80 }, // By the lake, on the path
-      AXE: { x: 35.5, y: 15, width: 80, height: 80 }, // Edge of the forest, on the path
-      SHOVEL: { x: 23, y: 9, width: 80, height: 80 }, // By the well, on the path
-      LANTERN: { x: 28, y: 6, width: 80, height: 80 }, // At the church entrance, on the path
-      PICKAXE: { x: 33, y: 16.5, width: 80, height: 80 }, // Near the forge, on the path
-      HAMMER: { x: 37, y: 4, width: 80, height: 80 }, // By the windmill, on the path
-      BUCKET: { x: 21, y: 13, width: 80, height: 80 }, // At the market, on the path
-      SCYTHE: { x: 40.5, y: 4, width: 80, height: 80 }, // In the fields, on the path
+      FISHING_ROD: { x: 6, y: 10, width: 80, height: 80 },
+      AXE: { x: 35.5, y: 15, width: 80, height: 80 },
+      SHOVEL: { x: 23, y: 9, width: 80, height: 80 },
+      LANTERN: { x: 28, y: 6, width: 80, height: 80 },
+      PICKAXE: { x: 33, y: 16.5, width: 80, height: 80 },
+      HAMMER: { x: 37, y: 4, width: 80, height: 80 },
+      BUCKET: { x: 21, y: 13, width: 80, height: 80 },
+      SCYTHE: { x: 40.5, y: 4, width: 80, height: 80 },
     };
 
     currentGameItems.forEach((itemName) => {
@@ -951,7 +906,6 @@ async claimDailyReward() {
     villager.name = id;
     villager.requiredItem = requiredItem;
 
-    // Add a lock icon so locked villagers are visible in the world
     if (requiredItem) {
       const lockIcon = this.add
         .text(villager.x, villager.y - 25, "🔒", {
@@ -960,7 +914,6 @@ async claimDailyReward() {
         .setOrigin(0.5)
         .setDepth(31);
       villager.lockIcon = lockIcon;
-      // hide initially if player already has the item
       lockIcon.setVisible(!this.playerInventory.has(requiredItem));
     } else {
       villager.lockIcon = null;
@@ -970,27 +923,24 @@ async claimDailyReward() {
   createPlayer(tileX, tileY) {
     const pixelX = tileX * this.tileSize + this.tileSize / 2;
     const pixelY = tileY * this.tileSize + this.tileSize / 2;
-    // Store the initial position for the reset feature
     this.initialPlayerPos = { x: pixelX, y: pixelY };
 
     this.player = this.physics.add
-      .sprite(pixelX, pixelY, "player_down") // Start with down-facing sprite
+      .sprite(pixelX, pixelY, "player_down")
       .setOrigin(0.5)
       .setDisplaySize(this.tileSize, this.tileSize)
       .setScale(0.08);
     this.player.setCollideWorldBounds(true);
     this.player.setDepth(10);
 
-    // Add direction tracking
     this.player.currentDirection = "down";
     this.player.lastDirection = "down";
 
     this.playerLight = this.lights
-      .addLight(pixelX, pixelY, 250)
+      .addLight(pixelX, pixelY, 100)
       .setColor(0xaaccff)
-      .setIntensity(2.0);
+      .setIntensity(1.0);
 
-    // Set physics world bounds to match the game world
     const worldWidth =
       Math.ceil(this.cameras.main.width / this.tileSize) * this.tileSize;
     const worldHeight =
@@ -1019,14 +969,12 @@ async claimDailyReward() {
       this.resetFeedbackText
         .setText("Hold [R] for 1.5s to reset position...")
         .setVisible(true);
-      // Start a timer to reset after 1.5 seconds
       this.resetTimer = this.time.delayedCall(1500, () => {
         this.player.setPosition(
           this.initialPlayerPos.x,
           this.initialPlayerPos.y
         );
         this.resetFeedbackText.setText("Position has been reset!");
-        // Hide the message after another second
         this.time.delayedCall(1000, () => {
           this.resetFeedbackText.setVisible(false);
         });
@@ -1080,7 +1028,6 @@ async claimDailyReward() {
     }
 
     if (Phaser.Input.Keyboard.JustDown(this.enterKey) && this.nearbyVillager) {
-      // If villager requires an item, always launch the ItemLockScene
       if (this.nearbyVillager.requiredItem) {
         this.scene.pause();
         this.scene.launch("ItemLockScene", {
@@ -1091,7 +1038,6 @@ async claimDailyReward() {
         });
         return;
       }
-      // Otherwise, proceed with the conversation
       this.initiateConversation(this.nearbyVillager);
     }
   }
@@ -1111,10 +1057,9 @@ async claimDailyReward() {
 
     if (conversationData) {
       this.scene.pause();
-      // CHANGE 3: Pass the stored this.gameData object to the DialogueScene.
       this.scene.launch("DialogueScene", {
         conversationData: conversationData,
-        newGameData: this.gameData, // Pass the whole stored object
+        newGameData: this.gameData,
         villagerSpriteKey: villager.texture.key,
       });
     } else {
@@ -1128,7 +1073,6 @@ async claimDailyReward() {
   update() {
     if (!this.player) return;
 
-    // --- Handle Mint Zone Visibility ---
     if (this.activeMintZone) {
       const playerBounds = this.player.getBounds();
       const zoneBounds = this.activeMintZone.getBounds();
@@ -1140,13 +1084,11 @@ async claimDailyReward() {
       } else {
         this.mintText.setPosition(this.player.x, this.player.y - 30);
         this.mintText.setVisible(true);
-        // Continuously update the text based on current inventory state
         this.updateMintZoneText(this.activeMintZone.itemName);
       }
     }
 
     if (Phaser.Input.Keyboard.JustDown(this.mintKey) && this.activeMintZone) {
-      // Prevent minting if the item is already in the inventory
       if (!this.playerInventory.has(this.activeMintZone.itemName)) {
         this.mintItem(this.activeMintZone.itemName);
       }
@@ -1162,7 +1104,6 @@ async claimDailyReward() {
     let velocityY = 0;
     let newDirection = this.player.currentDirection;
 
-    // Determine movement direction and update sprite
     if (this.cursors.left.isDown || this.wasd.A.isDown) {
       velocityX = -speed;
       newDirection = "left";
@@ -1179,9 +1120,7 @@ async claimDailyReward() {
       newDirection = "down";
     }
 
-    // Handle diagonal movement - prioritize the most recent input
     if (velocityX !== 0 && velocityY !== 0) {
-      // For diagonal movement, keep the last single direction pressed
       if (this.cursors.left.isDown || this.wasd.A.isDown) {
         if (
           (this.cursors.up.isDown || this.wasd.W.isDown) &&
@@ -1215,7 +1154,6 @@ async claimDailyReward() {
       velocityY = (velocityY / magnitude) * speed;
     }
 
-    // Update sprite texture if direction changed
     if (newDirection !== this.player.currentDirection) {
       this.player.setTexture(`player_${newDirection}`);
       this.player.lastDirection = this.player.currentDirection;
@@ -1235,16 +1173,13 @@ async claimDailyReward() {
       this.player.setVelocity(0, 0);
     }
 
-    // Keep lock icons positioned and visible only when the player lacks the required item
     this.villagers.getChildren().forEach((villager) => {
       if (villager.lockIcon) {
         villager.lockIcon.setPosition(villager.x, villager.y - 25);
-        // The lock icon should be visible as long as an item is required.
         villager.lockIcon.setVisible(!!villager.requiredItem);
       }
     });
 
-    // Check for nearby villagers
     this.nearbyVillager = null;
     this.villagers.getChildren().forEach((villager) => {
       const distance = Phaser.Math.Distance.Between(
@@ -1258,7 +1193,6 @@ async claimDailyReward() {
       }
     });
 
-    // Update interaction text visibility and content
     if (this.nearbyVillager) {
       if (this.nearbyVillager.requiredItem) {
         const itemName = this.nearbyVillager.requiredItem.replace(/_/g, ' ');
@@ -1279,32 +1213,27 @@ async claimDailyReward() {
       this.interactionText.setVisible(false);
     }
 
-    // Handle interaction when ENTER is pressed
     if (Phaser.Input.Keyboard.JustDown(this.enterKey) && this.nearbyVillager) {
       this.startConversation();
     }
   }
 
-  // Rename and simplify the interaction method
   startConversation() {
     if (!this.nearbyVillager) return;
 
-    // If villager requires an item, launch the item lock scene to handle the trade
     if (this.nearbyVillager.requiredItem) {
       this.scene.pause();
       this.scene.launch('ItemLockScene', {
         villager: this.nearbyVillager,
         account: this.account,
         gameData: this.gameData,
-        callingScene: 'HomeScene' // Pass the calling scene's key
+        callingScene: 'HomeScene'
       });
       return;
     }
 
-    // Start conversation
     console.log(`Starting conversation with villager: ${this.nearbyVillager.name}`);
     
-    // Disable input during conversation setup
     this.input.keyboard.enabled = false;
     this.player.setVelocity(0, 0);
     
@@ -1313,7 +1242,6 @@ async claimDailyReward() {
         console.log("Conversation data received:", conversationData);
         
         if (conversationData && conversationData.npc_dialogue) {
-          // Launch dialogue scene
           this.scene.launch("DialogueScene", {
             conversationData: conversationData,
             villagerSpriteKey: this.nearbyVillager.texture.key,
@@ -1346,8 +1274,6 @@ async claimDailyReward() {
     });
   }
 
-  // Remove the old handleInteraction method and keep the simplified logic
-  // ...existing code...
   unlockVillager(villagerName) {
     const villager = this.villagers
       .getChildren()
@@ -1355,7 +1281,6 @@ async claimDailyReward() {
     if (villager) {
       console.log(`Unlocking villager: ${villagerName}`);
       villager.requiredItem = null;
-      // Force update inventory from blockchain after unlocking
       this.updateInventory();
     }
   }
@@ -1370,9 +1295,7 @@ async claimDailyReward() {
     this.physics.add.overlap(this.player, zone, () => {
       this.activeMintZone = zone;
       console.log(`Creating mint zone for ${itemName} at (${x}, ${y})`);
-      // Make mint text yellow
       this.mintText.setStyle({ color: "#ffff00" });
-      // Check inventory and update the minting prompt accordingly
       this.updateMintZoneText(itemName);
     });
   }
@@ -1382,10 +1305,10 @@ async claimDailyReward() {
       this.mintText.setText(
         `You already own the ${itemName.replace(/_/g, " ")}`
       );
-      this.mintText.setStyle({ color: "#888888" }); // Gray color for owned items
+      this.mintText.setStyle({ color: "#888888" });
     } else {
       this.mintText.setText(`Press M to mint ${itemName.replace(/_/g, " ")}`);
-      this.mintText.setStyle({ color: "#ffff00" }); // Yellow for available items
+      this.mintText.setStyle({ color: "#ffff00" });
     }
   }
 
@@ -1421,11 +1344,9 @@ async claimDailyReward() {
         const provider = new ethers.BrowserProvider(window.ethereum);
         const signer = await provider.getSigner();
         
-        // Use the imported address and ABI
         const gameItemsContract = new ethers.Contract(CONTRACT_ADDRESSES.gameItems, GAME_ITEMS_ABI, signer);
 
         const itemNameFormatted = itemName.replace(/_/g, ' ');
-        // It's good practice to host metadata for your NFTs
         const tokenURI = `https://your-metadata-server.com/items/${itemName.toLowerCase()}.json`; 
         const description = `A trusty ${itemNameFormatted} for your adventures.`;
 
@@ -1439,19 +1360,17 @@ async claimDailyReward() {
         );
 
         mintingStatusText.setText("Transaction sent. Waiting for confirmation...");
-        const receipt = await tx.wait(); // Wait for the transaction to be mined
+        const receipt = await tx.wait();
 
         console.log("Mint successful! Transaction:", receipt.hash);
         
-        // Find the Transfer event in the transaction receipt to get the new tokenId
         let tokenId = null;
         const transferEvent = receipt.logs
             .map(log => {
                 try {
-                    // The parseLog function can throw if the log topic doesn't match the ABI
                     return gameItemsContract.interface.parseLog(log);
                 } catch (e) {
-                    return null; // Ignore logs that don't match the contract's ABI
+                    return null;
                 }
             })
             .find(event => 
@@ -1465,7 +1384,6 @@ async claimDailyReward() {
             console.log(`Parsed tokenId: ${tokenId} for item: ${itemName}`);
             mintingStatusText.setText(`${itemNameFormatted} minted successfully!`);
             
-            // Store the item name and its tokenId
             this.playerInventory.set(itemName, tokenId);
             await this.updateInventory();
         } else {
@@ -1483,7 +1401,6 @@ async claimDailyReward() {
         if (error.code === 'ACTION_REJECTED') {
             errorMessage = "Transaction rejected.";
         } else if (error.reason) {
-            // Display contract revert reasons
             errorMessage = `Minting failed: ${error.reason}`;
         }
         mintingStatusText.setText(errorMessage);
@@ -1495,16 +1412,52 @@ async claimDailyReward() {
     }
   }
   async updateInventory() {
-    if (!this.account) return;
+    if (!this.account || typeof window.ethereum === 'undefined') {
+        console.log("Wallet not connected, skipping inventory update.");
+        return;
+    }
 
     try {
-      // HERE the integration of a function to fetch the player's NFTs from an EVM contract is to be done.
-      console.log(
-        "Simulating inventory update. Current inventory:",
-        Array.from(this.playerInventory)
-      );
+        const provider = new ethers.BrowserProvider(window.ethereum);
+        const gameItemsContract = new ethers.Contract(CONTRACT_ADDRESSES.gameItems, GAME_ITEMS_ABI, provider);
+
+        const transferToFilter = gameItemsContract.filters.Transfer(null, this.account);
+        const transferFromFilter = gameItemsContract.filters.Transfer(this.account, null);
+
+        const transferToEvents = await gameItemsContract.queryFilter(transferToFilter, 0, 'latest');
+        const transferFromEvents = await gameItemsContract.queryFilter(transferFromFilter, 0, 'latest');
+
+        const ownedTokenIds = new Map();
+
+        for (const event of transferToEvents) {
+            const tokenId = event.args.tokenId.toString();
+            ownedTokenIds.set(tokenId, true);
+        }
+
+        for (const event of transferFromEvents) {
+            const tokenId = event.args.tokenId.toString();
+            ownedTokenIds.set(tokenId, false);
+        }
+
+        this.playerInventory.clear();
+
+        for (const [tokenId, isOwned] of ownedTokenIds.entries()) {
+            if (isOwned) {
+                try {
+                    const [name] = await gameItemsContract.getItem(tokenId);
+                    const itemName = name.replace(/ /g, '_').toUpperCase();
+                    this.playerInventory.set(itemName, tokenId);
+                } catch (e) {
+                    console.warn(`Could not fetch details for token ID ${tokenId}. It might have been traded in.`, e);
+                }
+            }
+        }
+
+        console.log("Player inventory updated from blockchain:", Array.from(this.playerInventory.entries()));
+
     } catch (error) {
-      console.error("Failed to update inventory:", error);
+        console.error("Failed to update inventory from blockchain:", error);
+        this.showErrorMessage("Could not load your items.");
     }
   }
 
@@ -1512,14 +1465,12 @@ async claimDailyReward() {
     const villagerId = villagerSprite.getData("villagerId");
     console.log(`Interacting with villager: ${villagerId}`);
     
-    // Check if we have conversation data
     getConversation(villagerId, "I'd like to talk.").then(conversationData => {
-      console.log("Raw conversation response:", conversationData); // Add this line
+      console.log("Raw conversation response:", conversationData);
       
       if (conversationData && conversationData.npc_dialogue) {
         console.log("Conversation data received:", conversationData);
         
-        // Launch dialogue scene with the conversation data
         this.scene.launch("DialogueScene", {
           conversationData: conversationData,
           villagerSpriteKey: villagerSprite.texture.key,
@@ -1528,7 +1479,6 @@ async claimDailyReward() {
         this.scene.pause();
       } else {
         console.error("Failed to get conversation data or missing npc_dialogue:", conversationData);
-        // Show a temporary message to the user
         const errorText = this.add.text(
           this.cameras.main.centerX, 
           this.cameras.main.centerY, 
@@ -1555,12 +1505,10 @@ async claimDailyReward() {
     });
   }
   shutdown() {
-    // Remove token balance UI
     if (this.tokenBalanceElement && this.tokenBalanceElement.parentNode) {
         this.tokenBalanceElement.parentNode.removeChild(this.tokenBalanceElement);
     }
     
-    // ... your existing shutdown code ...
   }
 
 }

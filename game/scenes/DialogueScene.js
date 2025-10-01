@@ -9,7 +9,7 @@ export class DialogueScene extends Phaser.Scene {
         this.newGameData = null;
         this.rightPanelContainer = null; 
         this.playerId = null;
-        this.callingScene = null; // Track which scene called this
+        this.callingScene = null;
         this.voices = [];
         this._currentSpeechResolve = null;
         this._currentSpeechTimer = null;
@@ -21,9 +21,8 @@ export class DialogueScene extends Phaser.Scene {
         this.villagerSpriteKey = data.villagerSpriteKey;
         this.newGameData = data.newGameData;
         this.playerId = data.playerId;
-        this.callingScene = data.callingScene || 'HomeScene'; // Default to HomeScene
+        this.callingScene = data.callingScene || 'HomeScene';
         
-        // Add validation
         if (!this.conversationData) {
             console.error("No conversation data provided to DialogueScene!");
             this.closeDialogue();
@@ -46,12 +45,10 @@ export class DialogueScene extends Phaser.Scene {
             return;
         }
         
-        // Make sure this scene is on top
         this.scene.bringToTop();
         
         this.initTTS();
         
-        // Create a full-screen black overlay with higher alpha for better visibility
         const overlay = this.add.rectangle(0, 0, this.cameras.main.width, this.cameras.main.height, 0x000000, 0.85)
             .setOrigin(0)
             .setDepth(0);
@@ -61,7 +58,6 @@ export class DialogueScene extends Phaser.Scene {
         const frameHeight = this.cameras.main.height - framePadding * 2;
         const cornerRadius = 30;
 
-        // Create main dialogue panel
         const panelWidth = this.cameras.main.width * 0.9;
         const panelHeight = this.cameras.main.height * 0.8;
         const panelX = this.cameras.main.centerX;
@@ -74,19 +70,16 @@ export class DialogueScene extends Phaser.Scene {
             .strokeRoundedRect(panelX - panelWidth / 2, panelY - panelHeight / 2, panelWidth, panelHeight, 16)
             .setDepth(1);
 
-        // Golden frame for visual appeal
         const frame = this.add.graphics()
             .lineStyle(10, 0xd4af37, 1)
             .strokeRoundedRect(framePadding, framePadding, frameWidth, frameHeight, cornerRadius)
             .setDepth(100);
 
-        // UI Creation
         this.createLeftPanel(panelX, panelY, panelWidth, panelHeight);
         
         this.rightPanelContainer = this.add.container().setDepth(10);
         this.displayConversationInRightPanel(panelX, panelY, panelWidth, panelHeight);
 
-        // Close button with better styling
         const closeButton = this.add.text(panelX, panelY + panelHeight / 2 - 30, 'Close Conversation', {
             fontFamily: 'Arial',
             fontSize: '18px',
@@ -100,13 +93,11 @@ export class DialogueScene extends Phaser.Scene {
             this.closeDialogue();
         });
 
-        // Add ESC key to close dialogue
         this.escKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
         this.escKey.on('down', () => {
             this.closeDialogue();
         });
 
-        // Entry Animation
         this.cameras.main.fadeIn(300, 0, 0, 0);
         
         console.log("DialogueScene created successfully with depth layers");
@@ -116,7 +107,6 @@ export class DialogueScene extends Phaser.Scene {
         this.stopSpeaking();
         this.scene.stop('DialogueScene');
         
-        // Resume the appropriate scene
         if (this.callingScene === 'MultiplayerScene') {
             this.scene.resume('MultiplayerScene');
             const multiplayerScene = this.scene.get('MultiplayerScene');
@@ -233,7 +223,6 @@ export class DialogueScene extends Phaser.Scene {
             fontStyle: 'italic'
         }).setOrigin(0.5).setDepth(5);
 
-        // Animate the text appearing
         this.tweens.add({
             targets: [nameText, titleBg, titleText, villagerImage],
             alpha: { from: 0, to: 1 },
@@ -261,19 +250,16 @@ export class DialogueScene extends Phaser.Scene {
             .setDepth(10);
         this.rightPanelContainer.add(dialogueText);
         
-        // Start speech
         this.speakText(this.conversationData.npc_dialogue, this.conversationData.villagerName);
 
         let startY = rightPanelY + dialogueText.getBounds().height + 50;
 
-        // Create suggestion buttons
         this.conversationData.player_suggestions.forEach((suggestion, index) => {
             const button = this.createSuggestionButton(rightPanelX, startY + (index * 70), suggestion, () => {
                 this.getNextDialogue(this.conversationData.villager_id, suggestion);
             });
             this.rightPanelContainer.add(button);
 
-            // Staggered fade-in animation
             button.setAlpha(0);
             this.tweens.add({
                 targets: button,
@@ -351,4 +337,3 @@ export class DialogueScene extends Phaser.Scene {
         this.stopSpeaking();
     }
 }
-

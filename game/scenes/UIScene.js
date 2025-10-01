@@ -235,7 +235,7 @@ export class UIScene extends Phaser.Scene {
       ...locationButtons,
       hintText,
     ]);
-    this._locationOverlay.setDepth(200).setScrollFactor(0);
+    this._locationOverlay.setDepth(5000).setScrollFactor(0);
 
     const closeOverlay = () => {
       if (this._locationOverlay) {
@@ -330,7 +330,6 @@ export class UIScene extends Phaser.Scene {
   }
 
   update() {
-    // This scene does not need a continuous update loop
   }
 
   updateTimer() {

@@ -16,6 +16,7 @@ export class InventoryScene extends Phaser.Scene {
     }
 
     create() {
+        this.scene.bringToTop();
         this.add.rectangle(0, 0, this.cameras.main.width, this.cameras.main.height, 0x000000, 0.7).setOrigin(0);
 
         const panelWidth = this.cameras.main.width * 0.6;
@@ -38,9 +39,9 @@ export class InventoryScene extends Phaser.Scene {
                 fontFamily: 'Arial', fontSize: '20px', color: '#dddddd', align: 'center'
             }).setOrigin(0.5);
         } else {
-            this.inventory.forEach((item, index) => {
-                const itemName = item.replace(/_/g, ' ');
-                this.add.text(panelX, panelY - panelHeight / 2 + 120 + (index * 40), `• ${itemName}`, {
+            this.inventory.forEach(([itemName, tokenId], index) => {
+                const formattedItemName = itemName.replace(/_/g, ' ');
+                this.add.text(panelX, panelY - panelHeight / 2 + 120 + (index * 40), `• ${formattedItemName}`, {
                     fontFamily: 'Arial', fontSize: '24px', color: '#ffffff'
                 }).setOrigin(0.5);
             });

@@ -72,7 +72,10 @@ const GameModeSelectionCard = ({
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-4 py-16 bg-gradient-to-b from-black/60 to-black/80">
+    <div 
+      className="min-h-screen flex flex-col items-center justify-center px-4 py-16 bg-gradient-to-b from-black/60 to-black/80"
+      style={{ position: 'relative', zIndex: 100 }}
+    >
       <div className="max-w-6xl w-full">
         {/* Header Section */}
         <div className="text-center mb-12">
