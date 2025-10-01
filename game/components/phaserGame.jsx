@@ -6,6 +6,7 @@ import { HomeScene } from '../scenes/HomeScene';
 import { DialogueScene } from '../scenes/DialogueScene';
 import { ItemLockScene } from '../scenes/ItemlockScene';
 import { MultiplayerScene } from '../scenes/MultiplayerScene';
+import { UIScene } from '../scenes/UIScene';
 
 const PhaserGame = ({ gameConfig }) => {
   const gameRef = useRef(null);
@@ -31,7 +32,7 @@ const PhaserGame = ({ gameConfig }) => {
         }
       },
       // Make sure DialogueScene is loaded BEFORE other scenes that might use it
-      scene: [DialogueScene, LoadingScene, VideoScene, HomeScene, ItemLockScene, MultiplayerScene]
+      scene: [DialogueScene,UIScene , LoadingScene, VideoScene, HomeScene, ItemLockScene, MultiplayerScene]
     };
 
     const game = new Phaser.Game(config);
