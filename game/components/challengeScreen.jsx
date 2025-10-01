@@ -17,14 +17,14 @@ const ChallengeScreen = ({ onAccept, onDecline, walletAddress }) => {
   const difficulties = ["Very Easy", "Easy", "Medium", "Hard"];
   const [time, setTime] = useState(12);
   const [stakeAmount, setStakeAmount] = useState(0.01);
-  const MIN_TIME = 1, MAX_TIME = 20, MIN_STAKE = 0.01, MAX_STAKE = 0.1;
+  const MIN_TIME = 1, MAX_TIME = 20, MIN_STAKE = 0.001, MAX_STAKE = 0.01;
 
   const rewardAmount = useMemo(() => {
     if (!isStaking) return 0;
-    const normalizedTime = (MAX_TIME - time) / (MAX_TIME - MIN_TIME);
-    const rewardMultiplier = 1.5 + normalizedTime * 1.0;
+    // The reward multiplier is fixed at 1.5x as per the smart contract
+    const rewardMultiplier = 1.5;
     return parseFloat((stakeAmount * rewardMultiplier).toFixed(4));
-  }, [time, stakeAmount, isStaking]);
+  }, [stakeAmount, isStaking]);
 
   const handleAccept = async () => {
     setTxStatus('');
@@ -60,7 +60,6 @@ const ChallengeScreen = ({ onAccept, onDecline, walletAddress }) => {
         console.log('Contract Address:', CONTRACT_ADDRESSES.stakingManager);
         console.log('ABI length:', STAKING_MANAGER_ABI.length);
 
-        // Check if contract exists at this address
         const contractCode = await provider.getCode(CONTRACT_ADDRESSES.stakingManager);
         if (contractCode === '0x') {
           setTxError("No contract found at the specified address. Make sure the contract is deployed.");
@@ -94,7 +93,6 @@ const ChallengeScreen = ({ onAccept, onDecline, walletAddress }) => {
         try {
           setTxStatus("Executing transaction...");
           
-          // Execute the transaction directly with error handling
           const stakeTx = await stakingManagerContract.stakeForSinglePlayer(
             targetDurationSeconds,
             { 
@@ -129,7 +127,6 @@ const ChallengeScreen = ({ onAccept, onDecline, walletAddress }) => {
           setTxError(errorMessage);
           setTxStatus('');
           
-          // Instead of returning, show error but continue with no-stake mode
           console.log("Proceeding with game without stake due to transaction failure");
           onAccept({
             difficulty: difficulty,
@@ -231,7 +228,7 @@ const ChallengeScreen = ({ onAccept, onDecline, walletAddress }) => {
             {/* Time Slider */}
             <div className="mb-8">
               <h3 className="text-2xl font-cinzel text-yellow-400 mb-4">Set Your Time</h3>
-              <p className="font-merriweather text-gray-400 mb-4">A shorter time limit increases your risk and potential reward multiplier.</p>
+              <p className="font-merriweather text-gray-400 mb-4">You must complete the challenge within this time to win the reward.</p>
               <div className="flex items-center justify-center gap-4">
                 <span className="font-bold text-lg">{MIN_TIME} min</span>
                 <input

@@ -7,6 +7,7 @@ import { DialogueScene } from '../scenes/DialogueScene';
 import { ItemLockScene } from '../scenes/ItemlockScene';
 import { MultiplayerScene } from '../scenes/MultiplayerScene';
 import { UIScene } from '../scenes/UIScene';
+import { InventoryScene } from '../scenes/InventoryScene';
 
 const PhaserGame = ({ gameConfig }) => {
   const gameRef = useRef(null);
@@ -16,12 +17,12 @@ const PhaserGame = ({ gameConfig }) => {
 
     const config = {
       type: Phaser.AUTO,
-      width: window.innerWidth,
-      height: window.innerHeight,
+      width: 1280,
+      height: 720,
       parent: 'phaser-game',
       backgroundColor: '#2c3e50',
       scale: {
-        mode: Phaser.Scale.RESIZE,
+        mode: Phaser.Scale.FIT,
         autoCenter: Phaser.Scale.CENTER_BOTH
       },
       physics: {
@@ -32,18 +33,19 @@ const PhaserGame = ({ gameConfig }) => {
         }
       },
       // Make sure DialogueScene is loaded BEFORE other scenes that might use it
-      scene: [DialogueScene,UIScene , LoadingScene, VideoScene, HomeScene, ItemLockScene, MultiplayerScene]
+      scene: [DialogueScene,UIScene  , InventoryScene , LoadingScene, VideoScene, HomeScene, ItemLockScene, MultiplayerScene]
     };
 
     const game = new Phaser.Game(config);
     gameRef.current = game;
 
     // Handle window resize
-    const handleResize = () => {
-      game.scale.resize(window.innerWidth, window.innerHeight);
-    };
+    // The FIT scale mode handles resizing automatically
+    // const handleResize = () => {
+    //   game.scale.resize(window.innerWidth, window.innerHeight);
+    // };
 
-    window.addEventListener('resize', handleResize);
+    // window.addEventListener('resize', handleResize);
 
     // Start the appropriate scene based on game mode
     if (gameConfig?.isMultiplayer) {
@@ -61,7 +63,7 @@ const PhaserGame = ({ gameConfig }) => {
     }
 
     return () => {
-      window.removeEventListener('resize', handleResize);
+      // window.removeEventListener('resize', handleResize);
       if (gameRef.current) {
         gameRef.current.destroy(true);
         gameRef.current = null;

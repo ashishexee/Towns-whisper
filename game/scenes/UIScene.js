@@ -27,75 +27,106 @@ export class UIScene extends Phaser.Scene {
   create() {
     this.elapsedSeconds = this.registry.get("elapsedTime") || 0;
 
-    // Create UI buttons
+    this.timerText = this.add
+      .text(
+        this.cameras.main.width / 2,
+        this.cameras.main.height - 70,
+        this.formatTime(this.elapsedSeconds),
+        {
+          fontFamily: "Arial",
+          fontSize: "24px",
+          color: "#d4af37",
+          stroke: "#000000",
+          strokeThickness: 4,
+        }
+      )
+      .setOrigin(0.5)
+      .setScrollFactor(0);
+
     this.createInventoryButton();
-    this.createTimerText();
 
     if (this.inaccessibleLocations && this.inaccessibleLocations.length > 0) {
       this.createLocationButton();
     }
-    
-    this.createResetHintText();
 
-    console.log("UIScene created");
+    this.time.addEvent({
+      delay: 1000,
+      callback: this.updateTimer,
+      callbackScope: this,
+      loop: true,
+    });
+
+    this.resetHintText = this.add
+      .text(
+        this.cameras.main.width - 16,
+        this.cameras.main.height - 8,
+        "Hold [R] if your character is stuck",
+        {
+          fontFamily: "Arial",
+          fontSize: "14px",
+          color: "#aaaaaa",
+          backgroundColor: "rgba(0,0,0,0.35)",
+          padding: { x: 8, y: 4 },
+        }
+      )
+      .setOrigin(1, 1)
+      .setDepth(300)
+      .setScrollFactor(0);
   }
-  
-  createTimerText() {
-    this.timerText = this.add
-      .text(0, 0, this.formatTime(this.elapsedSeconds), {
+
+  createLocationButton() {
+    const button = this.add
+      .text(150, this.cameras.main.height - 70, "Choose Location", {
         fontFamily: "Arial",
         fontSize: "24px",
-        color: "#d4af37",
-        stroke: "#000000",
-        strokeThickness: 4,
-      })
-      .setOrigin(0.5)
-      .setScrollFactor(0)
-      .setDepth(2000);
-    
-    this.updateTimerPosition();
-  }
-
- createLocationButton() {
-    this.locationButton = this.add
-      .text(0, 0, "Choose Location", {
-        fontFamily: "Arial",
-        fontSize: "20px",
-        color: this.locationButtonEnabled ? "#000000" : "#ffffff", // White text when disabled
-        backgroundColor: this.locationButtonEnabled ? "#d4af37" : "#666666", // Lighter grey for disabled
-        padding: { x: 12, y: 6 },
+        color: "#A9A9A9",
+        backgroundColor: "#555555",
+        padding: { x: 15, y: 8 },
       })
       .setOrigin(0.5)
       .setInteractive({ useHandCursor: true })
-      .setScrollFactor(0)
-      .setDepth(3000); // Increased depth to render on top of everything
+      .setScrollFactor(0);
 
-    this.locationButton.on("pointerdown", () => {
+    button.on("pointerdown", () => {
       if (this.locationButtonEnabled) {
-        this.locationButton.setBackgroundColor("#d4af37");
+        this.showLocationChoices();
       } else {
-        this.locationButton.setBackgroundColor("#666666"); // Keep disabled color on pointer out
+        this.showDisabledLocationMessage();
       }
     });
 
-    this.updateLocationButtonPosition();
+    button.on("pointerover", () => {
+      if (this.locationButtonEnabled) {
+        button.setBackgroundColor("#f5d56b");
+      }
+    });
+    button.on("pointerout", () => {
+      if (this.locationButtonEnabled) {
+        button.setBackgroundColor("#d4af37");
+      }
+    });
+    this.locationButton = button;
   }
 
   createInventoryButton() {
-    this.inventoryButton = this.add
-      .text(0, 0, "Inventory", {
-        fontFamily: "Arial",
-        fontSize: "20px",
-        color: "#000000",
-        backgroundColor: "#d4af37",
-        padding: { x: 12, y: 6 },
-      })
+    const button = this.add
+      .text(
+        this.cameras.main.width - 150,
+        this.cameras.main.height - 70,
+        "Inventory",
+        {
+          fontFamily: "Arial",
+          fontSize: "24px",
+          color: "#000000",
+          backgroundColor: "#d4af37",
+          padding: { x: 15, y: 8 },
+        }
+      )
       .setOrigin(0.5)
       .setInteractive({ useHandCursor: true })
-      .setScrollFactor(0)
-      .setDepth(2000);
+      .setScrollFactor(0);
 
-    this.inventoryButton.on("pointerdown", () => {
+    button.on("pointerdown", () => {
       const homeScene = this.scene.get("HomeScene");
       if (homeScene && homeScene.scene.isActive()) {
         homeScene.scene.pause();
@@ -105,97 +136,25 @@ export class UIScene extends Phaser.Scene {
       }
     });
 
-    this.inventoryButton.on("pointerover", () => this.inventoryButton.setBackgroundColor("#f5d56b"));
-    this.inventoryButton.on("pointerout", () => this.inventoryButton.setBackgroundColor("#d4af37"));
-
-    this.updateInventoryButtonPosition();
-  }
-
-  createResetHintText() {
-    this.resetHintText = this.add
-      .text(0, 0, "Hold [R] if your character is stuck", {
-        fontFamily: "Arial",
-        fontSize: "14px",
-        color: "#aaaaaa",
-        backgroundColor: "rgba(0,0,0,0.7)",
-        padding: { x: 8, y: 4 },
-      })
-      .setOrigin(1, 1)
-      .setDepth(2000)
-      .setScrollFactor(0);
-
-    this.updateResetHintPosition();
-  }
-
-  // Update positions based on camera view
-  updateTimerPosition() {
-    if (this.timerText) {
-      const camera = this.cameras.main;
-      this.timerText.setPosition(
-        camera.scrollX + camera.width / 2,
-        camera.scrollY + 30 // Move to top of the screen
-      );
-    }
-  }
-
-  updateLocationButtonPosition() {
-    if (this.locationButton) {
-      const camera = this.cameras.main;
-      this.locationButton.setPosition(
-        camera.scrollX + 150,
-        camera.scrollY + camera.height - 40 // Position at bottom-left
-      );
-    }
-  }
-
-  updateInventoryButtonPosition() {
-    if (this.inventoryButton) {
-      const camera = this.cameras.main;
-      this.inventoryButton.setPosition(
-        camera.scrollX + camera.width - 150,
-        camera.scrollY + camera.height - 40 // Position at bottom-right
-      );
-    }
-  }
-
-  updateResetHintPosition() {
-    if (this.resetHintText) {
-      const camera = this.cameras.main;
-      this.resetHintText.setPosition(
-        camera.scrollX + camera.width - 16,
-        camera.scrollY + camera.height - 8
-      );
-    }
-  }
-
-  // Call this method every frame to update UI positions
-  updateUIPositions() {
-    this.updateTimerPosition();
-    this.updateLocationButtonPosition();
-    this.updateInventoryButtonPosition();
-    this.updateResetHintPosition();
+    button.on("pointerover", () => button.setBackgroundColor("#f5d56b"));
+    button.on("pointerout", () => button.setBackgroundColor("#d4af37"));
+    this.inventoryButton = button;
   }
 
   showDisabledLocationMessage() {
     const remainingSeconds = 120 - this.elapsedSeconds;
     const message = `Available in ${remainingSeconds} seconds.`;
-    const camera = this.cameras.main;
 
     const feedbackText = this.add
-      .text(
-        camera.scrollX + camera.width / 2,
-        camera.scrollY + camera.height / 2 - 50,
-        message,
-        {
-          fontFamily: "Arial",
-          fontSize: "18px",
-          color: "#ffdddd",
-          backgroundColor: "rgba(0,0,0,0.7)",
-          padding: { x: 10, y: 5 },
-        }
-      )
+      .text(this.locationButton.x, this.locationButton.y - 50, message, {
+        fontFamily: "Arial",
+        fontSize: "18px",
+        color: "#ffdddd",
+        backgroundColor: "rgba(0,0,0,0.7)",
+        padding: { x: 10, y: 5 },
+      })
       .setOrigin(0.5)
-      .setDepth(2001)
+      .setDepth(201)
       .setScrollFactor(0);
 
     this.time.delayedCall(1500, () => {
@@ -206,27 +165,18 @@ export class UIScene extends Phaser.Scene {
   showLocationChoices() {
     if (this._locationOverlay) return;
 
-    const camera = this.cameras.main;
-    const width = camera.width;
-    const height = camera.height;
+    const { width, height } = this.cameras.main;
 
     const blocker = this.add
-      .rectangle(
-        camera.scrollX,
-        camera.scrollY,
-        width,
-        height,
-        0x000000,
-        0.7
-      )
+      .rectangle(0, 0, width, height, 0x000000, 0.7)
       .setOrigin(0)
       .setInteractive()
       .setScrollFactor(0);
 
     const panelHeight = 80 + this.inaccessibleLocations.length * 70;
     const panelWidth = 400;
-    const panelX = camera.scrollX + width / 2 - panelWidth / 2;
-    const panelY = camera.scrollY + height / 2 - panelHeight / 2;
+    const panelX = width / 2 - panelWidth / 2;
+    const panelY = height / 2 - panelHeight / 2;
 
     const panel = this.add
       .graphics()
@@ -237,16 +187,11 @@ export class UIScene extends Phaser.Scene {
       .setScrollFactor(0);
 
     const title = this.add
-      .text(
-        camera.scrollX + width / 2,
-        panelY + 40,
-        "Choose a Location to Investigate",
-        {
-          fontFamily: "Georgia, serif",
-          fontSize: "24px",
-          color: "#ffffff",
-        }
-      )
+      .text(width / 2, panelY + 40, "Choose a Location to Investigate", {
+        fontFamily: "Georgia, serif",
+        fontSize: "24px",
+        color: "#ffffff",
+      })
       .setOrigin(0.5)
       .setScrollFactor(0);
 
@@ -254,7 +199,7 @@ export class UIScene extends Phaser.Scene {
       (location, index) => {
         const buttonY = panelY + 90 + index * 60;
         const button = this.add
-          .text(camera.scrollX + width / 2, buttonY, location, {
+          .text(width / 2, buttonY, location, {
             fontFamily: "Arial",
             fontSize: "20px",
             color: "#000000",
@@ -275,16 +220,11 @@ export class UIScene extends Phaser.Scene {
     );
 
     const hintText = this.add
-      .text(
-        camera.scrollX + width / 2,
-        panelY + panelHeight - 18,
-        "Press Enter to close",
-        {
-          fontFamily: "Arial",
-          fontSize: "14px",
-          color: "#cccccc",
-        }
-      )
+      .text(width / 2, panelY + panelHeight - 18, "Press Enter to close", {
+        fontFamily: "Arial",
+        fontSize: "14px",
+        color: "#cccccc",
+      })
       .setOrigin(0.5)
       .setScrollFactor(0);
 
@@ -295,8 +235,7 @@ export class UIScene extends Phaser.Scene {
       ...locationButtons,
       hintText,
     ]);
-    this._locationOverlay.setDepth(2500);
-    this._locationOverlay.setScrollFactor(0);
+    this._locationOverlay.setDepth(200).setScrollFactor(0);
 
     const closeOverlay = () => {
       if (this._locationOverlay) {
@@ -324,8 +263,8 @@ export class UIScene extends Phaser.Scene {
     const camera = this.cameras.main;
     const feedbackText = this.add
       .text(
-        camera.scrollX + camera.width / 2,
-        camera.scrollY + camera.height / 2,
+        camera.width / 2,
+        camera.height / 2,
         `Investigating ${location}...`,
         {
           fontFamily: "Arial",
@@ -370,6 +309,7 @@ export class UIScene extends Phaser.Scene {
         const finalScore = baseScore + timeBonus - guessPenalty + nftBonus;
 
         this.scene.stop("HomeScene");
+        this.scene.stop("UIScene");
         this.scene.start("EndScene", {
           score: Math.round(finalScore),
           time: this.formatTime(this.elapsedSeconds),
@@ -389,9 +329,8 @@ export class UIScene extends Phaser.Scene {
     }
   }
 
-  // Add an update method to continuously update UI positions
   update() {
-    this.updateUIPositions();
+    // This scene does not need a continuous update loop
   }
 
   updateTimer() {
