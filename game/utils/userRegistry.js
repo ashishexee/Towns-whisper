@@ -9,7 +9,7 @@ const USER_REGISTRY_ABI = [
     "event UserRegistered(address indexed userAddress, string username, uint256 timestamp)"
 ];
 
-const USER_REGISTRY_ADDRESS = "0xffd7c7a891300758507f4ac1303a6a9f1deb7946"; // Replace with deployed contract address
+const USER_REGISTRY_ADDRESS = "0xe9120a0a7cf5d30ed632967591d3cd9e6a9a2842"; // sepolia testnet deployed
 
 export class UserRegistryService {
     constructor(provider, signer) {

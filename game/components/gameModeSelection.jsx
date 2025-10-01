@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { ethers } from 'ethers';
-// Add this import with your other imports
-import TokenBalance from './TokenBalance';
 
 // SVG Icons
 const SinglePlayerIcon = () => (
@@ -75,82 +73,79 @@ const GameModeSelection = ({ onPlaySingle, onCreateRoom, onJoinRoom, username, w
     }, [walletAddress, userRegistryService]);
 
     return (
-        <div className="h-screen flex flex-col justify-center items-center text-center px-4 bg-gray-900/80 text-white relative">
-            {/* Rune Token Balance Overlay - Top Left */}
-            <TokenBalance 
-                accountId={walletAddress} 
-                showChests={true} 
-                position="top-left"
-            />
+        <div className="min-h-screen bg-gray-900 text-white">
+            <div className="h-screen flex flex-col justify-center items-center text-center px-4 bg-gray-900/80 text-white relative">
+                {/* Rune Token Balance Overlay removed */}
 
-            {/* Top Bar with Balance and Username */}
-            <div className="absolute top-0 left-0 right-0 flex justify-between items-center p-6 bg-black/30 backdrop-blur-sm border-b border-teal-400/20" style={{ paddingLeft: '280px' }}>
-                {/* Balance - Top Left (moved right to avoid overlap) */}
-                <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                    <span className="text-sm text-gray-400">ETH Balance:</span>
-                    <span className="font-bold text-teal-300">
-                        {isLoadingBalance ? (
-                            <span className="animate-pulse">Loading...</span>
-                        ) : (
-                            `${balance} ETH`
-                        )}
-                    </span>
-                </div>
-
-                {/* Username - Top Center */}
-                <div className="absolute left-1/2 transform -translate-x-1/2">
-                    <div className="flex items-center gap-2 bg-gray-800/50 px-4 py-2 rounded-full border border-teal-400/30">
-                        <div className="w-8 h-8 bg-teal-400 rounded-full flex items-center justify-center">
-                            <span className="text-gray-900 font-bold text-sm">
-                                {username ? username.charAt(0).toUpperCase() : 'U'}
-                            </span>
-                        </div>
-                        <span className="font-semibold text-white">
-                            {username || 'Unknown User'}
+                {/* Top Bar with Balance and Username */}
+                <div className="absolute top-0 left-0 right-0 flex justify-between items-center p-6 bg-black/30 backdrop-blur-sm border-b border-teal-400/20">
+                    {/* Balance - Top Left (moved right to avoid overlap) */}
+                    <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                        <span className="text-sm text-gray-400">ETH Balance:</span>
+                        <span className="font-bold text-teal-300">
+                            {isLoadingBalance ? (
+                                <span className="animate-pulse">Loading...</span>
+                            ) : (
+                                `${balance} ETH`
+                            )}
                         </span>
                     </div>
+
+                    {/* Username - Top Center */}
+                    <div className="absolute left-1/2 transform -translate-x-1/2">
+                        <div className="flex items-center gap-2 bg-gray-800/50 px-4 py-2 rounded-full border border-teal-400/30">
+                            <div className="w-8 h-8 bg-teal-400 rounded-full flex items-center justify-center">
+                                <span className="text-gray-900 font-bold text-sm">
+                                    {username ? username.charAt(0).toUpperCase() : 'U'}
+                                </span>
+                            </div>
+                            <span className="font-semibold text-white">
+                                {username || 'Unknown User'}
+                            </span>
+                        </div>
+                    </div>
+
+                    {/* Spacer for balance on right side */}
+                    <div className="w-32"></div>
                 </div>
 
-                {/* Spacer for balance on right side */}
-                <div className="w-32"></div>
-            </div>
+                {/* Main Content */}
+                <div className="max-w-6xl w-full mx-auto mt-20">
+                    <h1 className="text-5xl font-cinzel text-teal-300 mb-4">Choose Your Path</h1>
+                    <p className="text-xl text-gray-300 mb-12 font-merriweather">
+                        How would you like to uncover the mystery?
+                    </p>
 
-            {/* Main Content */}
-            <div className="max-w-6xl w-full mx-auto mt-20">
-                <h1 className="text-5xl font-cinzel text-teal-300 mb-4">Choose Your Path</h1>
-                <p className="text-xl text-gray-300 mb-12 font-merriweather">
-                    How would you like to uncover the mystery?
-                </p>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                    <GameModeCard
-                        title="Single Player"
-                        description="Uncover the village's secrets on your own and solve the mystery."
-                        buttonText="Start Investigation"
-                        onButtonClick={onPlaySingle}
-                        icon={<SinglePlayerIcon />}
-                        borderColor="border-teal-400/50 hover:border-teal-400/60"
-                        buttonColor="bg-teal-400 hover:bg-teal-300 hover:shadow-teal-300/50"
-                    />
-                    <GameModeCard
-                        title="Create Room"
-                        description="Create a new multiplayer room and invite your friends to join."
-                        buttonText="Create Room"
-                        onButtonClick={onCreateRoom}
-                        icon={<CreateRoomIcon />}
-                        borderColor="border-purple-400/50 hover:border-purple-400/60"
-                        buttonColor="bg-purple-400 hover:bg-purple-300 hover:shadow-purple-300/50"
-                    />
-                    <GameModeCard
-                        title="Join Room"
-                        description="Join an existing room with a room code to play with others."
-                        buttonText="Join Room"
-                        onButtonClick={onJoinRoom}
-                        icon={<JoinRoomIcon />}
-                        borderColor="border-yellow-400/50 hover:border-yellow-400/60"
-                        buttonColor="bg-yellow-400 hover:bg-yellow-300 hover:shadow-yellow-300/50"
-                    />
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                        <GameModeCard
+                            title="Single Player"
+                            description="Uncover the village's secrets on your own and solve the mystery."
+                            buttonText="Start Investigation"
+                            onButtonClick={onPlaySingle}
+                            icon={<SinglePlayerIcon />}
+                            borderColor="border-teal-400/50 hover:border-teal-400/60"
+                            buttonColor="bg-teal-400 hover:bg-teal-300 hover:shadow-teal-300/50"
+                        />
+                        <GameModeCard
+                            title="Create Room"
+                            description="Create a new multiplayer room and invite your friends to join."
+                            buttonText="Create Room"
+                            onButtonClick={onCreateRoom}
+                            icon={<CreateRoomIcon />}
+                            borderColor="border-purple-400/50 hover:border-purple-400/60"
+                            buttonColor="bg-purple-400 hover:bg-purple-300 hover:shadow-purple-300/50"
+                        />
+                        <GameModeCard
+                            title="Join Room"
+                            description="Join an existing room with a room code to play with others."
+                            buttonText="Join Room"
+                            onButtonClick={onJoinRoom}
+                            icon={<JoinRoomIcon />}
+                            borderColor="border-yellow-400/50 hover:border-yellow-400/60"
+                            buttonColor="bg-yellow-400 hover:bg-yellow-300 hover:shadow-yellow-300/50"
+                        />
+                    </div>
                 </div>
             </div>
         </div>
