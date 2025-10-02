@@ -9,8 +9,8 @@ import requests # Import the requests library
 # Define the URL for our local Node.js bridge server
 OG_BRIDGE_URL = "http://localhost:3001/generate-narrative"
 
-class GeminiAPI:
-    def __init__(self, api_key):
+class ZeroGravityAI_API:
+    def __init__(self):
         # The api_key is no longer used for Gemini, but the GameEngine passes it.
         # We just need to ensure self.model is not None so the checks pass.
         self.model = True 

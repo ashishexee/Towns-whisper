@@ -4,12 +4,12 @@
 import json
 import traceback
 from .state_manager import GameState
-from .llm_calls import GeminiAPI
+from .llm_calls import ZeroGravityAI_API
 from config import VILLAGER_ROSTER, FAMILIARITY_LEVELS
 
 class GameEngine:
-    def __init__(self, api_key: str):
-        self.llm_api = GeminiAPI(api_key)
+    def __init__(self):
+        self.llm_api = ZeroGravityAI_API()
 
     def start_new_game(self, game_id: str, num_inaccessible_locations: int, difficulty: str) -> GameState:
         game_state = GameState(game_id, difficulty)

@@ -12,7 +12,7 @@ if (!PRIVATE_KEY) {
 
 const RPC_URL = "https://evmrpc-testnet.0g.ai";
 const LLAMA_PROVIDER_ADDRESS = "0xf07240Efa67755B5311bc75784a061eDB47165Dd";
-const MINIMUM_DEPOSIT_AMOUNT = "0.01";
+const MINIMUM_DEPOSIT_AMOUNT = "1.1";
 
 const app = express();
 app.use(express.json());
@@ -80,7 +80,7 @@ const startServer = async () => {
         try {
             computeLedger = await broker.ledger.getLedger();
         } catch (error) {
-                if (error.code === 'BAD_DATA') {
+                if (error.code === 'BAD_DATA' || (error.revert && error.revert.name === 'LedgerNotExists')) {
                         console.log("No existing compute ledger found for this wallet. Attempting to create one...");
                         computeLedger = null;
                 } else {
@@ -88,29 +88,34 @@ const startServer = async () => {
                 }
         }
 
-        if (!computeLedger || ethers.parseEther(computeLedger.totalBalance.toString()) === 0n) {
-                console.log("Ledger is empty or non-existent. A one-time deposit is required.");
+        const requiredLedgerBalance = ethers.parseEther(MINIMUM_DEPOSIT_AMOUNT);
+        if (!computeLedger || computeLedger.totalBalance < requiredLedgerBalance) {
+                console.log("Ledger is empty or has insufficient funds. A deposit is required.");
                 
                 const walletBalance = await provider.getBalance(wallet.address);
-                const requiredBalance = ethers.parseEther(MINIMUM_DEPOSIT_AMOUNT);
+                const amountToDeposit = requiredLedgerBalance - (computeLedger ? computeLedger.totalBalance : 0n);
+                const amountToDepositEther = ethers.formatEther(amountToDeposit);
 
                 console.log(`Wallet Balance: ${ethers.formatEther(walletBalance)} OG`);
-                console.log(`Required Deposit: ${MINIMUM_DEPOSIT_AMOUNT} OG`);
+                console.log(`Required Deposit / Top-up: ${amountToDepositEther} OG`);
 
-                if (walletBalance < requiredBalance) {
-                        console.error(`FATAL: Insufficient wallet balance. You need at least ${MINIMUM_DEPOSIT_AMOUNT} OG to initialize the compute ledger.`);
+                if (walletBalance < amountToDeposit) {
+                        console.error(`FATAL: Insufficient wallet balance. You need at least ${amountToDepositEther} OG to fund the compute ledger.`);
                         console.error(`Please get tokens from the 0G Discord faucet and send them to ${wallet.address}`);
                         process.exit(1);
                 }
 
-                console.log("Depositing funds to create the on-chain compute ledger...");
-                const tx = await broker.ledger.addLedger(MINIMUM_DEPOSIT_AMOUNT);
-                await tx.wait();
-                console.log("Successfully deposited and created ledger!");
+                if (!computeLedger) {
+                        console.log("Depositing funds to create the on-chain compute ledger...");
+                } else {
+                        console.log("Depositing funds to top up the on-chain compute ledger...");
+                }
+                await broker.ledger.addLedger(Number(amountToDepositEther));
+                console.log("Successfully deposited funds!");
         }
 
         const finalLedger = await broker.ledger.getLedger();
-        console.log(`Current 0G Compute balance: ${ethers.formatEther(finalLedger.balance)} OG`);
+        console.log(`Current 0G Compute balance: ${ethers.formatEther(finalLedger.totalBalance)} OG`);
         
         try {
                 console.log(`Acknowledging provider ${LLAMA_PROVIDER_ADDRESS}...`);

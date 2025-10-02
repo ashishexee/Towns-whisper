@@ -8,21 +8,22 @@ import { ItemLockScene } from '../scenes/ItemlockScene';
 import { MultiplayerScene } from '../scenes/MultiplayerScene';
 import { UIScene } from '../scenes/UIScene';
 import { InventoryScene } from '../scenes/InventoryScene';
-
+import {EndScene} from '../scenes/EndScene'
+ 
 const PhaserGame = ({ gameConfig }) => {
   const gameRef = useRef(null);
 
   useEffect(() => {
-    if (gameRef.current) return; // Prevent duplicate games
+    if (gameRef.current) return;
 
     const config = {
       type: Phaser.AUTO,
-      width: 1280,
-      height: 720,
+      width: '100%',
+      height: '100%',
       parent: 'phaser-game',
-      backgroundColor: '#2c3e50',
+      backgroundColor: '#000000',
       scale: {
-        mode: Phaser.Scale.FIT,
+        mode: Phaser.Scale.RESIZE,
         autoCenter: Phaser.Scale.CENTER_BOTH
       },
       physics: {
@@ -32,8 +33,7 @@ const PhaserGame = ({ gameConfig }) => {
           debug: false
         }
       },
-      // Make sure DialogueScene is loaded BEFORE other scenes that might use it
-      scene: [DialogueScene,UIScene  , InventoryScene , LoadingScene, VideoScene, HomeScene, ItemLockScene, MultiplayerScene]
+      scene: [DialogueScene,UIScene  ,EndScene, InventoryScene , LoadingScene, VideoScene, HomeScene, ItemLockScene, MultiplayerScene]
     };
 
     const game = new Phaser.Game(config);

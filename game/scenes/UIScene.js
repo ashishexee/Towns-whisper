@@ -30,7 +30,7 @@ export class UIScene extends Phaser.Scene {
     this.timerText = this.add
       .text(
         this.cameras.main.width / 2,
-        this.cameras.main.height - 70,
+        this.cameras.main.height - 80,
         this.formatTime(this.elapsedSeconds),
         {
           fontFamily: "Arial",
@@ -41,7 +41,8 @@ export class UIScene extends Phaser.Scene {
         }
       )
       .setOrigin(0.5)
-      .setScrollFactor(0);
+      .setScrollFactor(0)
+      .setDepth(0);
 
     this.createInventoryButton();
 
@@ -59,7 +60,7 @@ export class UIScene extends Phaser.Scene {
     this.resetHintText = this.add
       .text(
         this.cameras.main.width - 16,
-        this.cameras.main.height - 8,
+        this.cameras.main.height - 30,
         "Hold [R] if your character is stuck",
         {
           fontFamily: "Arial",
@@ -76,7 +77,7 @@ export class UIScene extends Phaser.Scene {
 
   createLocationButton() {
     const button = this.add
-      .text(150, this.cameras.main.height - 70, "Choose Location", {
+      .text(150, this.cameras.main.height - 80, "Choose Location", {
         fontFamily: "Arial",
         fontSize: "24px",
         color: "#A9A9A9",
@@ -85,7 +86,8 @@ export class UIScene extends Phaser.Scene {
       })
       .setOrigin(0.5)
       .setInteractive({ useHandCursor: true })
-      .setScrollFactor(0);
+      .setScrollFactor(0)
+      .setDepth(300);
 
     button.on("pointerdown", () => {
       if (this.locationButtonEnabled) {
@@ -112,7 +114,7 @@ export class UIScene extends Phaser.Scene {
     const button = this.add
       .text(
         this.cameras.main.width - 150,
-        this.cameras.main.height - 70,
+        this.cameras.main.height - 80,
         "Inventory",
         {
           fontFamily: "Arial",
@@ -124,7 +126,8 @@ export class UIScene extends Phaser.Scene {
       )
       .setOrigin(0.5)
       .setInteractive({ useHandCursor: true })
-      .setScrollFactor(0);
+      .setScrollFactor(0)
+      .setDepth(300);
 
     button.on("pointerdown", () => {
       const homeScene = this.scene.get("HomeScene");
