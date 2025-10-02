@@ -1,18 +1,14 @@
 # main.py
 # This script runs the FastAPI server, exposing the game engine through API endpoints.
 
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
-from fastapi.middleware.cors import CORSMiddleware
-from typing import Dict, List
-import uuid
 import os
 import traceback
-import sys
-from dotenv import load_dotenv
-from datetime import datetime, timedelta
-from hcs_service import hcs_service
+from typing import Dict, List, Optional
+import uuid
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 
-# --- IMPORTS WITH HEDERA SERVICE ---
 from schemas import *
 import json
 from game_logic.engine import GameEngine
@@ -24,9 +20,15 @@ from mirror_node_service import mirror_service
 
 app = FastAPI()
 
+# Add CORS middleware to allow requests from your frontend
+origins = [
+    "http://localhost",
+    "http://localhost:5173", # Adjust if your frontend runs on a different port
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

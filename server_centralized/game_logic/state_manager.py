@@ -17,3 +17,5 @@ class GameState:
             "unproductive_turns": {} # Tracks turns since last clue for each villager
         }
         self.full_npc_memory = {}
+        self.multiplayer_states = {}
+        self.multiplayer_memories = {}

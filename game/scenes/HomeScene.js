@@ -64,104 +64,18 @@ export class HomeScene extends Phaser.Scene {
     
     this.tokenBalanceElement.innerHTML = `
         <div style="display: flex; align-items: center; margin-bottom: 10px;">
-            <span style="margin-right: 10px;">💰</span>
-            <span id="balance-text" style="color: #fbbf24;">Loading...</span>
-            <button id="refresh-btn" style="margin-left: 10px; background: none; border: none; color: #9ca3af; cursor: pointer; font-size: 14px;" title="Refresh balance">🔄</button>
+            <span id="balance-text" style="color: #fbbf24; line-height: 1.5;">[C] - Choose Location<br>[I] - Inventory</span>
         </div>
-        <div id="chest-buttons" style="display: flex; gap: 8px; flex-direction: column;"></div>
     `;
     
     document.body.appendChild(this.tokenBalanceElement);
-    
-    document.getElementById('refresh-btn').onclick = () => this.updateTokenBalance();
-    
-    this.updateTokenBalance();
-}
-async updateTokenBalance() {
-    if (!this.account) return;
-    
-    try {
-        const result = await getTokenBalance(this.account);
-        if (result && result.status === 'success') {
-            this.currentBalance = result.balance;
-            document.getElementById('balance-text').textContent = `${this.currentBalance.toLocaleString()} RN`;
-            this.updateChestButtons();
-        }
-    } catch (error) {
-        console.error('Error fetching token balance:', error);
-        document.getElementById('balance-text').textContent = 'Error loading balance';
-    }
-}
-updateChestButtons() {
-    const chestContainer = document.getElementById('chest-buttons');
-    if (!chestContainer) return;
-    
-    const lastWelcome = localStorage.getItem(`welcome_${this.account}`);
-    const lastDaily = localStorage.getItem(`daily_${this.account}`);
-    const now = Date.now();
-    
-    const showWelcome = !lastWelcome;
-    const showDaily = !lastDaily || (now - parseInt(lastDaily) > 24 * 60 * 60 * 1000);
-    
-    chestContainer.innerHTML = '';
-    
-    if (showWelcome) {
-        const welcomeBtn = document.createElement('button');
-        welcomeBtn.innerHTML = '🎁 Welcome Bonus (250 RN)';
-        welcomeBtn.style.cssText = `
-            background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
-            border: none; color: white; padding: 8px 12px; border-radius: 8px;
-            font-size: 12px; cursor: pointer; font-weight: bold;
-        `;
-        welcomeBtn.onclick = () => this.claimWelcomeBonus();
-        chestContainer.appendChild(welcomeBtn);
-    }
-    
-    if (showDaily) {
-        const dailyBtn = document.createElement('button');
-        dailyBtn.innerHTML = '📅 Daily Reward (50-200 RN)';
-        dailyBtn.style.cssText = `
-            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-            border: none; color: white; padding: 8px 12px; border-radius: 8px;
-            font-size: 12px; cursor: pointer; font-weight: bold;
-        `;
-        dailyBtn.onclick = () => this.claimDailyReward();
-        chestContainer.appendChild(dailyBtn);
-    }
-}
-async claimWelcomeBonus() {
-    try {
-        const result = await claimWelcomeBonus(this.account);
-        if (result && result.status === 'success') {
-            alert(`Welcome bonus scheduled! You'll receive ${result.amount} Rune tokens in 1 minute.`);
-            localStorage.setItem(`welcome_${this.account}`, Date.now().toString());
-            this.updateChestButtons();
-            setTimeout(() => this.updateTokenBalance(), 2000);
-        }
-    } catch (error) {
-        alert('Welcome bonus already claimed or error occurred.');
-    }
-}
-
-async claimDailyReward() {
-    try {
-        const result = await claimDailyReward(this.account);
-        if (result && result.status === 'success') {
-            alert(`Daily reward scheduled! You'll receive ${result.amount} Rune tokens in 5 minutes.`);
-            localStorage.setItem(`daily_${this.account}`, Date.now().toString());
-            this.updateChestButtons();
-            setTimeout(() => this.updateTokenBalance(), 2000);
-        }
-    } catch (error) {
-        alert('Daily reward already claimed or cooldown active.');
-    }
 }
 
   async create() {
+    this.scene.bringToTop("UIScene");
     this.startTime = this.time.now;
     const width = this.cameras.main.width;
     const height = this.cameras.main.height;
-    this.createTokenBalanceUI();
     const overlay = this.add
       .rectangle(0, 0, width, height, 0x000000, 0.9)
       .setOrigin(0)
@@ -421,35 +335,35 @@ async claimDailyReward() {
       await this.updateInventory();
     }
 
-    const framePadding = 25;
-    const extraBottomSpace = 110;
-    const frameWidth = this.cameras.main.width - framePadding * 2;
-    const frameHeight =
-      this.cameras.main.height - framePadding * 2 - extraBottomSpace;
-    const cornerRadius = 30;
+    // const framePadding = 25;
+    // const extraBottomSpace = 110;
+    // const frameWidth = this.cameras.main.width - framePadding * 2;
+    // const frameHeight =
+    //   this.cameras.main.height - framePadding * 2 - extraBottomSpace;
+    // const cornerRadius = 30;
 
-    const maskShape = this.make.graphics();
-    maskShape.fillStyle(0xffff00);
-    maskShape.fillRoundedRect(
-      framePadding,
-      framePadding,
-      frameWidth,
-      frameHeight,
-      cornerRadius
-    );
-    this.cameras.main.setMask(maskShape.createGeometryMask());
+    // const maskShape = this.make.graphics();
+    // maskShape.fillStyle(0xffff00);
+    // maskShape.fillRoundedRect(
+    //   framePadding,
+    //   framePadding,
+    //   frameWidth,
+    //   frameHeight,
+    //   cornerRadius
+    // );
+    // this.cameras.main.setMask(maskShape.createGeometryMask());
 
-    const frame = this.add.graphics();
-    frame.lineStyle(10, 0xd4af37, 1);
-    frame.strokeRoundedRect(
-      framePadding,
-      framePadding,
-      frameWidth,
-      frameHeight,
-      cornerRadius
-    );
-    frame.setDepth(100);
-    frame.setScrollFactor(0);
+    // const frame = this.add.graphics();
+    // frame.lineStyle(10, 0xd4af37, 1);
+    // frame.strokeRoundedRect(
+    //   framePadding,
+    //   framePadding,
+    //   frameWidth,
+    //   frameHeight,
+    //   cornerRadius
+    // );
+    // frame.setDepth(100);
+    // frame.setScrollFactor(0);
 
     if (
       !this.sound.get("background_music") ||
@@ -755,6 +669,7 @@ async claimDailyReward() {
     this.cameras.main.startFollow(this.player);
     this.cameras.main.setFollowOffset(0, 0);
     this.cameras.main.setLerp(0.1, 0.1);
+    this.cameras.main.setZoom(1);
 
     const worldWidth =
       Math.ceil(this.cameras.main.width / this.tileSize) * this.tileSize;
@@ -781,6 +696,10 @@ async claimDailyReward() {
       .setVisible(false);
 
     this.mintKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.M);
+
+    this.inventoryKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.I);
+    this.chooseLocationKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.C);
+
     this.mintText = this.add
       .text(0, 0, "Press M to mint", {
         fontFamily: "Arial",
@@ -1092,6 +1011,20 @@ async claimDailyReward() {
       if (!this.playerInventory.has(this.activeMintZone.itemName)) {
         this.mintItem(this.activeMintZone.itemName);
       }
+    }
+
+    if (Phaser.Input.Keyboard.JustDown(this.inventoryKey)) {
+      this.scene.launch("InventoryScene", { account: this.account });
+      this.scene.pause();
+    }
+
+    if (Phaser.Input.Keyboard.JustDown(this.chooseLocationKey)) {
+      this.scene.launch("UIScene", {
+        account: this.account,
+        inaccessibleLocations: this.gameData.inaccessible_locations,
+        difficulty: this.difficulty,
+      });
+      this.scene.bringToTop("UIScene");
     }
 
     if (this.playerLight) {
