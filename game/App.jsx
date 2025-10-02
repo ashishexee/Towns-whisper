@@ -12,8 +12,6 @@ import UserRegistration from './components/UserRegistration';
 import { UserRegistryService } from './utils/userRegistry';
 import RoomLobby from './components/RoomLobby';
 
-import { openRewardChest } from './api';
-
 function App() {
   const [currentView, setCurrentView] = useState('landing');
   const [gameConfig, setGameConfig] = useState(null);
@@ -28,6 +26,7 @@ function App() {
 
   // --- 2. ADD NEW STATE FOR THE REWARD CHEST POPUP ---
   const [showRewardChest, setShowRewardChest] = useState(false);
+  const [gameWonData, setGameWonData] = useState(null);
 
   const dialogues = [
     { speaker: 'You', text: "Ugh... Where am I? My head... what happened?", portrait: '/assets/character_portraits/hemlock.png' },
@@ -40,10 +39,23 @@ function App() {
 
   // --- 3. ADD USEEFFECT TO LISTEN FOR THE 'gameWon' EVENT ---
   useEffect(() => {
-    const handleGameWon = () => {
-      console.log("React heard the 'gameWon' event from Phaser!");
-      setCurrentView('landing'); // Return to the main screen
-      setShowRewardChest(true); // Show the reward popup
+    const handleGameWon = (event) => {
+      console.log("React heard the 'gameWon' event from Phaser!", event.detail);
+
+      // Check if the game that just ended was a staking game
+      if (gameConfig && gameConfig.isStaking) {
+        const { elapsedTime } = event.detail;
+        console.log(`Staked game won! Player: ${walletAddress}, Duration: ${elapsedTime}s.`);
+        
+        alert(`Congratulations! Your game has been completed in ${elapsedTime.toFixed(2)} seconds. Your stake is being settled on-chain, and any rewards will be sent directly to your wallet.`);
+        
+        // Return to the main screen
+        setCurrentView('gameMode'); 
+      } else {
+        // For non-staked games, use the existing reward chest logic
+        setGameWonData(event.detail);
+        setShowRewardChest(true); // Show the reward popup
+      }
     };
 
     window.addEventListener('gameWon', handleGameWon);
@@ -52,7 +64,7 @@ function App() {
     return () => {
       window.removeEventListener('gameWon', handleGameWon);
     };
-  }, []); // Empty dependency array means this runs once on mount
+  }, [gameConfig, walletAddress]); // Add gameConfig and walletAddress to dependency array
 
   // --- 4. ADD THE HANDLER FUNCTION TO CLAIM THE REWARD ---
   const handleClaimReward = async () => {
@@ -62,7 +74,10 @@ function App() {
     }
 
     console.log(`Claiming reward for wallet: ${walletAddress}`);
-    const result = await openRewardChest(walletAddress);
+    const isStakingGame = gameConfig && gameConfig.isStaking;
+    const actualDuration = isStakingGame ? gameWonData?.elapsedTime : null;
+
+    const result = await openRewardChest(walletAddress, actualDuration);
 
     if (result && result.status === 'success') {
       alert("Success! Your reward has been scheduled. Check your wallet in about 30 minutes.");

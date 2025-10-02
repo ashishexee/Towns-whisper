@@ -14,6 +14,7 @@ export class UIScene extends Phaser.Scene {
     this.locationButtonEnabled = false;
     this.resetHintText = null;
     this.inventoryButton = null;
+    this.homeScene = null;
   }
 
   init(data) {
@@ -22,6 +23,7 @@ export class UIScene extends Phaser.Scene {
       this.account = data.account;
       this.difficulty = data.difficulty || "Easy";
     }
+    this.homeScene = this.scene.get("HomeScene");
   }
 
   create() {
@@ -44,11 +46,9 @@ export class UIScene extends Phaser.Scene {
       .setScrollFactor(0)
       .setDepth(0);
 
+    this.createLocationButton();
     this.createInventoryButton();
-
-    if (this.inaccessibleLocations && this.inaccessibleLocations.length > 0) {
-      this.createLocationButton();
-    }
+    this.createGiveUpButton();
 
     this.time.addEvent({
       delay: 1000,
@@ -57,22 +57,7 @@ export class UIScene extends Phaser.Scene {
       loop: true,
     });
 
-    this.resetHintText = this.add
-      .text(
-        this.cameras.main.width - 16,
-        this.cameras.main.height - 30,
-        "Hold [R] if your character is stuck",
-        {
-          fontFamily: "Arial",
-          fontSize: "14px",
-          color: "#aaaaaa",
-          backgroundColor: "rgba(0,0,0,0.35)",
-          padding: { x: 8, y: 4 },
-        }
-      )
-      .setOrigin(1, 1)
-      .setDepth(300)
-      .setScrollFactor(0);
+    this.updateLocationButtonState();
   }
 
   createLocationButton() {
@@ -89,21 +74,38 @@ export class UIScene extends Phaser.Scene {
       .setScrollFactor(0)
       .setDepth(300);
 
-    button.on("pointerdown", () => {
-      if (this.locationButtonEnabled) {
-        this.showLocationChoices();
-      } else {
+    button.on("pointerdown", async () => {
+      if (!this.locationButtonEnabled) {
         this.showDisabledLocationMessage();
+        return;
+      }
+
+      if (this.homeScene.isStaking && this.homeScene.guessMade) {
+        const success = await this.homeScene.payGuessPenalty();
+        if (success) {
+          this.homeScene.guessMade = false;
+          this.updateLocationButtonState();
+          this.showLocationChoices();
+        }
+      } else if (this.homeScene.wrongLocationChosen) {
+        const success = await this.homeScene.payGuessPenalty(); // Assuming the same penalty logic
+        if (success) {
+          this.homeScene.wrongLocationChosen = false;
+          this.updateLocationButtonState();
+          this.showLocationChoices();
+        }
+      } else {
+        this.showLocationChoices();
       }
     });
 
     button.on("pointerover", () => {
-      if (this.locationButtonEnabled) {
+      if (this.locationButtonEnabled && !this.homeScene.wrongLocationChosen) {
         button.setBackgroundColor("#f5d56b");
       }
     });
     button.on("pointerout", () => {
-      if (this.locationButtonEnabled) {
+      if (this.locationButtonEnabled && !this.homeScene.wrongLocationChosen) {
         button.setBackgroundColor("#d4af37");
       }
     });
@@ -144,8 +146,53 @@ export class UIScene extends Phaser.Scene {
     this.inventoryButton = button;
   }
 
+  createGiveUpButton() {
+    const button = this.add
+      .text(this.cameras.main.width - 100, 40, "Give Up", {
+        fontFamily: "Arial",
+        fontSize: "24px",
+        color: "#ffffff",
+        backgroundColor: "#992222",
+        padding: { x: 15, y: 8 },
+      })
+      .setOrigin(0.5)
+      .setInteractive({ useHandCursor: true })
+      .setScrollFactor(0)
+      .setDepth(300);
+
+    let giveUpTimer = null;
+
+    button.on("pointerdown", () => {
+      button.setText("Hold...");
+      giveUpTimer = this.time.delayedCall(3000, () => {
+        window.location.reload();
+      });
+    });
+
+    button.on("pointerup", () => {
+      if (giveUpTimer) {
+        giveUpTimer.remove(false);
+      }
+      button.setText("Give Up");
+    });
+
+    button.on("pointerout", () => {
+      if (giveUpTimer) {
+        giveUpTimer.remove(false);
+      }
+      button.setText("Give Up");
+      button.setBackgroundColor("#992222");
+    });
+
+    button.on("pointerover", () => {
+      button.setBackgroundColor("#cc3333");
+    });
+
+    this.giveUpButton = button;
+  }
+
   showDisabledLocationMessage() {
-    const remainingSeconds = 120 - this.elapsedSeconds;
+    const remainingSeconds = 5 - this.elapsedSeconds;
     const message = `Available in ${remainingSeconds} seconds.`;
 
     const feedbackText = this.add
@@ -167,6 +214,11 @@ export class UIScene extends Phaser.Scene {
 
   showLocationChoices() {
     if (this._locationOverlay) return;
+
+    // Lock location choices if a penalty is due in a staking game.
+    if (this.homeScene.isStaking && this.homeScene.guessMade) {
+      return;
+    }
 
     const { width, height } = this.cameras.main;
 
@@ -324,8 +376,14 @@ export class UIScene extends Phaser.Scene {
       });
     } else {
       feedbackText.setText(`Nothing found at ${location}. Try again.`);
-      const homeScene = this.scene.get("HomeScene");
-      homeScene.guessCount++;
+      this.homeScene.guessCount++;
+      if (this.homeScene.isStaking) {
+        this.homeScene.guessMade = true;
+      } else {
+        // Lock location button and change text for non-staking wrong guess
+        this.homeScene.wrongLocationChosen = true;
+      }
+      this.updateLocationButtonState();
       this.time.delayedCall(2000, () => {
         feedbackText.destroy();
       });
@@ -333,29 +391,49 @@ export class UIScene extends Phaser.Scene {
   }
 
   update() {
+    if (this.elapsedSeconds >= 5 && !this.locationButtonEnabled) {
+      this.locationButtonEnabled = true;
+      this.locationButton.setBackgroundColor("#d4af37");
+      this.locationButton.setColor("#000000");
+      this.updateLocationButtonState();
+    }
   }
 
   updateTimer() {
     this.elapsedSeconds++;
     this.registry.set("elapsedTime", this.elapsedSeconds);
     this.timerText.setText(this.formatTime(this.elapsedSeconds));
-
-    if (
-      !this.locationButtonEnabled &&
-      this.elapsedSeconds >= 5 &&
-      this.locationButton
-    ) {
-      this.locationButtonEnabled = true;
-      this.locationButton.setBackgroundColor("#d4af37");
-      this.locationButton.setColor("#000000");
-    }
   }
 
   formatTime(seconds) {
     const minutes = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${minutes.toString().padStart(2, "0")}:${secs
+    const partInSeconds = seconds % 60;
+    return `${minutes.toString().padStart(2, "0")}:${partInSeconds
       .toString()
       .padStart(2, "0")}`;
+  }
+
+  updateLocationButtonState() {
+    if (!this.locationButton) return;
+
+    if (this.homeScene.isStaking && this.homeScene.guessMade) {
+      this.locationButton.setText("Pay 0.01 ETH to Guess Again");
+      this.locationButton.setBackgroundColor("#992222");
+      this.locationButton.setColor("#ffffff");
+    } else if (this.homeScene.wrongLocationChosen) {
+      this.locationButton.setText("Deposit 0.01 ETH");
+      this.locationButton.setBackgroundColor("#992222"); // Red color for penalty
+      this.locationButton.setColor("#ffffff");
+      this.locationButtonEnabled = true; // Keep button interactive for deposit
+    } else {
+      this.locationButton.setText("Choose Location");
+      if (this.locationButtonEnabled) {
+        this.locationButton.setBackgroundColor("#d4af37");
+        this.locationButton.setColor("#000000");
+      } else {
+        this.locationButton.setBackgroundColor("#555555");
+        this.locationButton.setColor("#A9A9A9");
+      }
+    }
   }
 }

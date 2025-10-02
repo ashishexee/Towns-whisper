@@ -1,6 +1,6 @@
 import Phaser from "phaser";
-import { startNewGame, getConversation, getTokenBalance, claimWelcomeBonus, claimDailyReward } from "../api";
-import { GAME_ITEMS_ABI, CONTRACT_ADDRESSES } from '../../contracts_eth/config.js';
+import { startNewGame, getConversation} from "../api";
+import { GAME_ITEMS_ABI, CONTRACT_ADDRESSES, STAKING_MANAGER_ABI } from '../../contracts_eth/config.js';
 import { ethers } from 'ethers';
 
 export class HomeScene extends Phaser.Scene {
@@ -29,10 +29,12 @@ export class HomeScene extends Phaser.Scene {
     this.mintText = null;
     this.startTime = 0;
     this.guessCount = 0;
+    this.guessMade = false;
     this.nftCount = 0;
     this.tokenBalanceElement = null;
     this.currentBalance = 0;
     this.playerAccountId = null;
+    this.wrongLocationChosen = false;
   }
 
   init(data) {
@@ -42,6 +44,7 @@ export class HomeScene extends Phaser.Scene {
     }
     this.account = data ? data.account : null;
     this.difficulty = data ? data.difficulty || "Easy" : "Easy";
+    this.isStaking = data ? data.isStaking || false : false;
   }
   createTokenBalanceUI() {
     this.tokenBalanceElement = document.createElement('div');
@@ -1194,54 +1197,47 @@ export class HomeScene extends Phaser.Scene {
       });
   }
 
-  showErrorMessage(message) {
-    const errorText = this.add.text(
-      this.cameras.main.centerX, 
-      this.cameras.main.centerY, 
-      message, 
-      { fontSize: '24px', color: '#ff4444', backgroundColor: 'rgba(0,0,0,0.8)', padding: { x: 20, y: 10 } }
-    ).setOrigin(0.5).setDepth(200);
-    
-    this.time.delayedCall(2000, () => {
-      errorText.destroy();
-    });
-  }
-
-  unlockVillager(villagerName) {
-    const villager = this.villagers
-      .getChildren()
-      .find((v) => v.name === villagerName);
-    if (villager) {
-      console.log(`Unlocking villager: ${villagerName}`);
-      villager.requiredItem = null;
-      this.updateInventory();
+  /**
+   * Finalizes a staked game on the smart contract to transfer bonuses.
+   * This should be called from the EndScene when the game is won.
+   * NOTE: The connected account must be the owner of the StakingManager contract.
+   * @param {number} elapsedTime The total time taken to finish the game in seconds.
+   */
+  async finalizeStakedGame(elapsedTime) {
+    if (!this.isStaking) {
+      console.log("Not a staking game, no finalization needed.");
+      return;
     }
-  }
+    if (!this.account) {
+      console.error("Wallet not connected, cannot finalize game.");
+      return;
+    }
 
-  createMintingZone(x, y, width, height, itemName) {
-    const zone = this.add.zone(x, y, width, height).setOrigin(0);
-    this.physics.world.enable(zone);
-    zone.body.setAllowGravity(false);
-    zone.body.moves = false;
-    zone.itemName = itemName;
+    console.log(`Finalizing staked game. Time: ${elapsedTime}s`);
+    const statusText = this.add.text(
+      this.cameras.main.centerX, this.cameras.main.centerY,
+      "Finalizing game on-chain...",
+      { fontSize: "24px", color: "#2ecc71", backgroundColor: "rgba(0,0,0,0.8)", padding: { x: 20, y: 10 } }
+    ).setOrigin(0.5).setDepth(5000).setScrollFactor(0);
 
-    this.physics.add.overlap(this.player, zone, () => {
-      this.activeMintZone = zone;
-      console.log(`Creating mint zone for ${itemName} at (${x}, ${y})`);
-      this.mintText.setStyle({ color: "#ffff00" });
-      this.updateMintZoneText(itemName);
-    });
-  }
+    try {
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const signer = await provider.getSigner();
+      const stakingContract = new ethers.Contract(CONTRACT_ADDRESSES.stakingManager, STAKING_MANAGER_ABI, signer);
 
-  updateMintZoneText(itemName) {
-    if (this.playerInventory.has(itemName)) {
-      this.mintText.setText(
-        `You already own the ${itemName.replace(/_/g, " ")}`
-      );
-      this.mintText.setStyle({ color: "#888888" });
-    } else {
-      this.mintText.setText(`Press M to mint ${itemName.replace(/_/g, " ")}`);
-      this.mintText.setStyle({ color: "#ffff00" });
+      statusText.setText("Please confirm in wallet...");
+      // The contract requires the owner to settle the game.
+      const tx = await stakingContract.settleSinglePlayerGame(this.account, Math.round(elapsedTime));
+
+      statusText.setText("Settling game... Waiting for confirmation...");
+      await tx.wait();
+
+      statusText.setText("Game settled! Rewards are on their way.");
+    } catch (error) {
+      console.error("Failed to settle game:", error);
+      statusText.setText("Error settling game. See console.");
+    } finally {
+      this.time.delayedCall(4000, () => statusText.destroy());
     }
   }
 
@@ -1342,6 +1338,97 @@ export class HomeScene extends Phaser.Scene {
             mintingStatusText.destroy();
             this.input.keyboard.enabled = true;
         });
+    }
+  }
+
+  /**
+   * Handles the 0.01 ETH penalty for an incorrect guess in a staked game.
+   * This function should be called from another scene (e.g., UIScene) when a player guesses incorrectly.
+   * @returns {Promise<boolean>} True if the penalty was paid successfully, otherwise false.
+   */
+  async payGuessPenalty() {
+    if (!this.isStaking && !this.wrongLocationChosen) {
+      console.log("No penalty required.");
+      return true;
+    }
+    if (!this.account) {
+      this.showErrorMessage("Wallet not connected.");
+      return false;
+    }
+
+    this.input.keyboard.enabled = false;
+    const statusText = this.add.text(
+      this.cameras.main.centerX, this.cameras.main.centerY,
+      "Submitting 0.01 ETH penalty...",
+      { fontSize: "24px", color: "#d4af37", backgroundColor: "rgba(0,0,0,0.8)", padding: { x: 20, y: 10 } }
+    ).setOrigin(0.5).setDepth(101).setScrollFactor(0);
+
+    try {
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const signer = await provider.getSigner();
+      const stakingContract = new ethers.Contract(CONTRACT_ADDRESSES.stakingManager, STAKING_MANAGER_ABI, signer);
+
+      statusText.setText("Please confirm in wallet...");
+      const penaltyAmount = ethers.parseEther("0.01");
+      
+      const tx = await stakingContract.depositFundsForHint({ value: penaltyAmount });
+
+      statusText.setText("Transaction sent. Waiting...");
+      await tx.wait();
+
+      statusText.setText("Penalty paid successfully!");
+      return true;
+    } catch (error) {
+      console.error("Penalty payment failed:", error);
+      let errorMessage = "Penalty payment failed.";
+      if (error.code === 'ACTION_REJECTED') {
+        errorMessage = "Transaction rejected.";
+      }
+      statusText.setText(errorMessage);
+      return false;
+    } finally {
+      this.time.delayedCall(3000, () => {
+        statusText.destroy();
+        this.input.keyboard.enabled = true;
+      });
+    }
+  }
+
+  unlockVillager(villagerName) {
+    const villager = this.villagers
+      .getChildren()
+      .find((v) => v.name === villagerName);
+    if (villager) {
+      console.log(`Unlocking villager: ${villagerName}`);
+      villager.requiredItem = null;
+      this.updateInventory();
+    }
+  }
+
+  createMintingZone(x, y, width, height, itemName) {
+    const zone = this.add.zone(x, y, width, height).setOrigin(0);
+    this.physics.world.enable(zone);
+    zone.body.setAllowGravity(false);
+    zone.body.moves = false;
+    zone.itemName = itemName;
+
+    this.physics.add.overlap(this.player, zone, () => {
+      this.activeMintZone = zone;
+      console.log(`Creating mint zone for ${itemName} at (${x}, ${y})`);
+      this.mintText.setStyle({ color: "#ffff00" });
+      this.updateMintZoneText(itemName);
+    });
+  }
+
+  updateMintZoneText(itemName) {
+    if (this.playerInventory.has(itemName)) {
+      this.mintText.setText(
+        `You already own the ${itemName.replace(/_/g, " ")}`
+      );
+      this.mintText.setStyle({ color: "#888888" });
+    } else {
+      this.mintText.setText(`Press M to mint ${itemName.replace(/_/g, " ")}`);
+      this.mintText.setStyle({ color: "#ffff00" });
     }
   }
   async updateInventory() {

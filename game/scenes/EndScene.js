@@ -30,8 +30,8 @@ export class EndScene extends Phaser.Scene {
         }).setOrigin(0.5);
         if (this.endGameData.isCorrect) {
            console.log("Player won! Dispatching gameWon event.");
-           window.dispatchEvent(new CustomEvent('gameWon'));
-}
+           window.dispatchEvent(new CustomEvent('gameWon', { detail: this.endGameData }));
+        }
 
         if (this.endGameData.isTrueEnding) {
             this.add.text(centerX, centerY - 140, 'You uncovered the true story!', {
