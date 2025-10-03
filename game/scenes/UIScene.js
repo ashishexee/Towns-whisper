@@ -372,6 +372,10 @@ export class UIScene extends Phaser.Scene {
           nfts: homeScene.nftCount,
           account: this.account,
           story: result.story,
+          isCorrect: true,
+          isStaking: homeScene.isStaking,
+          elapsedTime: this.elapsedSeconds,
+          timeLimit: homeScene.timeLimit,
         });
       });
     } else {

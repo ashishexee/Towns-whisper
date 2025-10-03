@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ethers } from 'ethers';
+import { CONTRACT_ADDRESSES, STAKING_MANAGER_ABI } from '../../contracts_eth/config';
 
 const GameModeSelectionCard = ({ 
   onPlayClick, 
@@ -11,12 +12,15 @@ const GameModeSelectionCard = ({
   userRegistryService 
 }) => {
   const [balance, setBalance] = useState('0.00');
+  const [claimableReward, setClaimableReward] = useState('0.00');
+  const [isClaiming, setIsClaiming] = useState(false);
   const [isLoadingBalance, setIsLoadingBalance] = useState(true);
 
   useEffect(() => {
-    const fetchBalance = async () => {
-      if (!walletAddress) {
+    const fetchBalanceAndRewards = async () => {
+      if (!walletAddress || !userRegistryService) {
         setBalance('0.00');
+        setClaimableReward('0.00');
         setIsLoadingBalance(false);
         return;
       }
@@ -24,22 +28,65 @@ const GameModeSelectionCard = ({
       try {
         setIsLoadingBalance(true);
         const provider = userRegistryService.provider;
+        
+        // Fetch wallet balance
         const balanceWei = await provider.getBalance(walletAddress);
         const balanceEth = parseFloat(ethers.formatEther(balanceWei)).toFixed(4);
         setBalance(balanceEth);
+
+        // Fetch claimable rewards from StakingManager
+        const stakingManagerContract = new ethers.Contract(
+          CONTRACT_ADDRESSES.stakingManager,
+          STAKING_MANAGER_ABI,
+          provider
+        );
+        const rewardWei = await stakingManagerContract.claimableRewards(walletAddress);
+        const rewardEth = parseFloat(ethers.formatEther(rewardWei)).toFixed(4);
+        setClaimableReward(rewardEth);
+
+        const contractBalanceWei = await provider.getBalance(CONTRACT_ADDRESSES.stakingManager);
+        const contractBalanceEth = ethers.formatEther(contractBalanceWei);
+        console.log(`StakingManager Contract Balance: ${contractBalanceEth} ETH`);
       } catch (error) {
-        console.error("Error fetching balance:", error);
+        console.error("Error fetching balance and rewards:", error);
         setBalance('0.00');
+        setClaimableReward('0.00');
       } finally {
         setIsLoadingBalance(false);
       }
     };
 
-    fetchBalance();
+    fetchBalanceAndRewards();
 
-    const interval = setInterval(fetchBalance, 30000);
+    const interval = setInterval(fetchBalanceAndRewards, 30000);
     return () => clearInterval(interval);
   }, [walletAddress, userRegistryService]);
+
+  const handleClaimReward = async () => {
+    if (!walletAddress || !userRegistryService) {
+      alert('Please connect your wallet first!');
+      return;
+    }
+    setIsClaiming(true);
+    try {
+      const signer = await userRegistryService.provider.getSigner();
+      const stakingManagerContract = new ethers.Contract(
+        CONTRACT_ADDRESSES.stakingManager,
+        STAKING_MANAGER_ABI,
+        signer
+      );
+
+      const tx = await stakingManagerContract.claimReward();
+      await tx.wait();
+      alert('Reward claimed successfully!');
+      // Balances will refresh automatically on the next interval or page refresh.
+    } catch (error) {
+      console.error("Error claiming reward:", error);
+      alert(`Failed to claim reward: ${error.reason || error.message}`);
+    } finally {
+      setIsClaiming(false);
+    }
+  };
 
   const handlePlaySingle = () => {
     if (!walletAddress) {
@@ -91,6 +138,20 @@ const GameModeSelectionCard = ({
               <p className="text-gray-300 text-sm">
                 Balance: {isLoadingBalance ? 'Loading...' : `${balance} ETH`}
               </p>
+              {parseFloat(claimableReward) > 0 && (
+                <div className="mt-2">
+                  <p className="text-yellow-300 text-sm">
+                    Claimable Reward: {claimableReward} ETH
+                  </p>
+                  <button
+                    onClick={handleClaimReward}
+                    disabled={isClaiming}
+                    className="mt-2 px-4 py-1 bg-yellow-500 text-gray-900 text-xs font-bold rounded-md hover:bg-yellow-400 transition-all duration-300 disabled:bg-gray-600"
+                  >
+                    {isClaiming ? 'Claiming...' : 'Claim'}
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>

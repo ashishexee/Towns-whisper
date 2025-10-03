@@ -143,30 +143,13 @@ export class LoadingScene extends Phaser.Scene {
   }
 
   create() {
-    const framePadding = 20;
-    const frameWidth = this.cameras.main.width - framePadding * 2;
-    const frameHeight = this.cameras.main.height - framePadding * 2;
-    const cornerRadius = 30;
+    this.createLoadingBar();
+    this.startFileLoad();
 
-    const maskShape = this.make.graphics();
-    maskShape.fillStyle(0xffff00);
-    maskShape.fillRoundedRect(framePadding, framePadding, frameWidth, frameHeight, cornerRadius);
-    this.cameras.main.setMask(maskShape.createGeometryMask());
-
-    const frame = this.add.graphics();
-    frame.lineStyle(10, 0xd4af37, 1);
-    frame.strokeRoundedRect(framePadding, framePadding, frameWidth, frameHeight, cornerRadius);
-    frame.setDepth(100);
-
-    this.time.delayedCall(500, () => {
-      this.cameras.main.fadeOut(500, 0, 0, 0);
-      this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
-         const payload = { 
-           playerGender: this.playerGender,
-           account: this.account,
-           difficulty: this.difficulty
-         };
-        this.scene.start(this.nextScene, payload);
+    this.load.on('complete', () => {
+      this.time.delayedCall(500, () => {
+        // Pass the original, complete data object to the next scene
+        this.scene.start(this.nextScene, this.dataToPass);
       });
     });
   }

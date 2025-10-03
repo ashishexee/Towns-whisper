@@ -35,6 +35,7 @@ export class HomeScene extends Phaser.Scene {
     this.currentBalance = 0;
     this.playerAccountId = null;
     this.wrongLocationChosen = false;
+    this.timeLimit = null;
   }
 
   init(data) {
@@ -45,6 +46,7 @@ export class HomeScene extends Phaser.Scene {
     this.account = data ? data.account : null;
     this.difficulty = data ? data.difficulty || "Easy" : "Easy";
     this.isStaking = data ? data.isStaking || false : false;
+    this.timeLimit = data ? data.timeLimit : null;
   }
   createTokenBalanceUI() {
     this.tokenBalanceElement = document.createElement('div');

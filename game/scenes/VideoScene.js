@@ -119,11 +119,8 @@ export class VideoScene extends Phaser.Scene {
 
     startHomeScene() {
         window.speechSynthesis.cancel();
-        this.scene.start('HomeScene', { 
-            playerGender: this.playerGender,
-            account: this.account,
-            difficulty: this.dataToPass.difficulty
-        });
+        // Pass the entire original config object forward to the HomeScene
+        this.scene.start('HomeScene', this.dataToPass);
     }
 
     showDialogue() {
