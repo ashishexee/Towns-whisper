@@ -34,16 +34,18 @@ contract StakingManager is Ownable, ReentrancyGuard {
 
     mapping(address => SinglePlayerStake) public singlePlayerStakes;
     mapping(uint256 => MultiplayerGame) public multiplayerGames;
+    mapping(address => uint256) public claimableRewards; // ADDED: To hold rewards pending claim
     uint256 public nextGameId;
 
     // ============== EVENTS ==============
 
     event StakeCreated(address indexed player, uint256 amount, uint256 targetDuration);
     event MultiplayerGameCreated(uint256 indexed gameId, address[] players, uint256 stakePerPlayer);
-    event SinglePlayerGameSettled(address indexed player, uint256 rewardAmount, bool won);
     event MultiplayerGameSettled(uint256 indexed gameId, address indexed winner, uint256 prizePool);
     event FundsWithdrawn(address indexed owner, uint256 amount);
     event FundsDeposited(address indexed from, uint256 amount);
+    event RewardClaimed(address indexed player, uint256 amount);
+    event StakeForfeited(address indexed player, uint256 amount);
 
 
     // ============== CONSTRUCTOR ==============
@@ -55,15 +57,6 @@ contract StakingManager is Ownable, ReentrancyGuard {
     // ============== SINGLE-PLAYER FUNCTIONS ==============
 
     /**
-     * @dev Allows anyone to deposit funds into the contract, for example, to pay for an extra guess.
-     * These funds contribute to the overall reward pool.
-     */
-    function depositFundsForHint() external payable {
-        require(msg.value > 0, "Deposit must be greater than 0");
-        emit FundsDeposited(msg.sender, msg.value);
-    }
-
-    /**
      * @dev Allows a player to stake the native token on a personal challenge.
      * @param _targetDuration The target completion time in seconds.
      */
@@ -71,8 +64,6 @@ contract StakingManager is Ownable, ReentrancyGuard {
         require(msg.value > 0, "Stake amount must be greater than 0");
         require(_targetDuration > 0, "Target duration must be greater than 0");
         require(!singlePlayerStakes[msg.sender].isActive, "Player already has an active stake");
-
-        // Native token is transferred automatically with the 'payable' call.
 
         // Create and store the stake details
         singlePlayerStakes[msg.sender] = SinglePlayerStake({
@@ -82,7 +73,43 @@ contract StakingManager is Ownable, ReentrancyGuard {
             isActive: true
         });
 
+        // Do NOT immediately credit to claimable rewards
+        // The frontend will determine if they won, and only then can they claim
+        
         emit StakeCreated(msg.sender, msg.value, _targetDuration);
+    }
+
+    /**
+     * @dev Allows a player to claim their stake back after winning within time limit.
+     * Frontend determines eligibility - only winners within time limit should call this.
+     */
+    function claimReward() external nonReentrant {
+        SinglePlayerStake storage stake = singlePlayerStakes[msg.sender];
+        require(stake.isActive, "No active stake to claim from.");
+
+        uint256 amount = stake.amount;
+        require(amount > 0, "No stake to claim");
+
+        // Calculate the reward: 1.5x the original stake, matching the UI promise.
+        uint256 rewardAmount = (amount * 3) / 2;
+        require(address(this).balance >= rewardAmount, "Insufficient contract balance for reward payout.");
+
+        // Deactivate stake first
+        stake.isActive = false;
+
+        // Transfer the staked amount + bonus back to the player
+        (bool success, ) = payable(msg.sender).call{value: rewardAmount}("");
+        require(success, "Reward transfer failed");
+
+        emit RewardClaimed(msg.sender, rewardAmount);
+    }
+
+    /**
+     * @dev Allows a player to deposit funds for in-game actions, like paying a penalty for a wrong guess.
+     */
+    function depositFundsForHint() external payable {
+        require(msg.value > 0, "Deposit must be greater than 0");
+        emit FundsDeposited(msg.sender, msg.value);
     }
 
     // ============== MULTIPLAYER FUNCTIONS ==============
@@ -125,43 +152,21 @@ contract StakingManager is Ownable, ReentrancyGuard {
     // ============== SETTLEMENT FUNCTIONS (OWNER ONLY) ==============
 
     /**
-     * @dev Settles a single-player game. Called only by the backend.
-     * @param _player The address of the player whose game is being settled.
-     * @param _actualDuration The player's actual completion time in seconds.
+     * @dev Reclaims the stake from a player who did not win the game. Called by the backend.
+     * @param _player The address of the player whose stake is being reclaimed.
      */
-    function settleSinglePlayerGame(address _player, uint256 _actualDuration) external onlyOwner nonReentrant {
+    function reclaimForfeitedStake(address _player) external onlyOwner {
         SinglePlayerStake storage stake = singlePlayerStakes[_player];
-        require(stake.isActive, "No active stake for this player");
+        require(stake.isActive, "No active stake to reclaim.");
 
-        uint256 rewardAmount = 0;
-        bool playerWon = false;
+        uint256 amountToForfeit = stake.amount;
 
-        // Reward logic:
-        if (_actualDuration <= stake.targetDuration) {
-            // Player won, reward is 1.5x of their stake + a time-based bonus.
-            uint256 baseReward = (stake.amount * 3) / 2; // 1.5x
+        // Deactivate stake and forfeit to contract
+        stake.isActive = false;
+        
+        // The forfeited amount stays in the contract balance for owner withdrawal
 
-            // Bonus is proportional to how much faster they were, up to a max of 50% of the stake.
-            uint256 timeSaved = stake.targetDuration - _actualDuration;
-            uint256 timeBonus = (stake.amount * timeSaved) / (stake.targetDuration * 2);
-
-            rewardAmount = baseReward + timeBonus;
-            playerWon = true;
-        } else {
-            // Player lost, their stake is forfeited (stays in the contract)
-            rewardAmount = 0;
-        }
-
-        // Reset the player's stake
-        delete singlePlayerStakes[_player];
-
-        // Pay out the reward if they won
-        if (rewardAmount > 0) {
-            (bool success, ) = payable(_player).call{value: rewardAmount}("");
-            require(success, "Reward transfer failed");
-        }
-
-        emit SinglePlayerGameSettled(_player, rewardAmount, playerWon);
+        emit StakeForfeited(_player, amountToForfeit);
     }
 
     /**
@@ -199,4 +204,9 @@ contract StakingManager is Ownable, ReentrancyGuard {
 
         emit FundsWithdrawn(owner(), balance);
     }
+
+    /**
+     * @dev Receive Ether. This can be used by the owner to fund the contract for rewards.
+     */
+    receive() external payable {}
 }
