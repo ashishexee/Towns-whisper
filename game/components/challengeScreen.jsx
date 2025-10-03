@@ -84,7 +84,7 @@ const ChallengeScreen = ({ onAccept, onDecline, walletAddress }) => {
         console.log('Account balance:', ethers.formatEther(balance), 'ETH');
         
         if (balance < stakeAmountInWei) {
-          setTxError(`Insufficient balance. Required: ${ethers.formatEther(stakeAmountInWei)} ETH, Available: ${ethers.formatEther(balance)} ETH`);
+          setTxError("Insufficient balance for stake + gas.");
           setTxStatus('');
           return;
         }
@@ -96,7 +96,7 @@ const ChallengeScreen = ({ onAccept, onDecline, walletAddress }) => {
             targetDurationSeconds,
             { 
               value: stakeAmountInWei,
-              gasLimit: 500000 // Use a fixed high gas limit to avoid estimation failures
+              gasLimit: 500000 // A generous gas limit can prevent estimation errors
             }
           );
           
@@ -174,11 +174,10 @@ const ChallengeScreen = ({ onAccept, onDecline, walletAddress }) => {
 
     // Continue with game logic...
     onAccept({
-      difficulty: isStaking ? 'Medium' : difficulty,
-      isStaking: isStaking,
-      stakeAmount: isStaking ? `${stakeAmount.toFixed(4)} ETH` : "0 ETH",
-      rewardAmount: isStaking ? `${rewardAmount} ETH` : "0 ETH",
-      timeLimit: isStaking ? `${time} minutes` : null,
+      difficulty,
+      isStaking,
+      stakeAmount: isStaking ? stakeAmount : 0,
+      timeLimit: isStaking ? time * 60 : null, // Convert minutes to seconds
     });
   };
 

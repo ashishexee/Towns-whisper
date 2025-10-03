@@ -11,7 +11,7 @@ import ChallengeScreen from './components/challengeScreen';
 import UserRegistration from './components/UserRegistration';
 import { UserRegistryService } from './utils/userRegistry';
 import RoomLobby from './components/RoomLobby';
-
+import { CONTRACT_ADDRESSES, STAKING_MANAGER_ABI } from '../contracts_eth/config';
 function App() {
   const [currentView, setCurrentView] = useState('landing');
   const [gameConfig, setGameConfig] = useState(null);
@@ -29,42 +29,10 @@ function App() {
   const [gameWonData, setGameWonData] = useState(null);
 
   const dialogues = [
-    { speaker: 'You', text: "Ugh... Where am I? My head... what happened?", portrait: '/assets/character_portraits/hemlock.png' },
-    { speaker: 'Villager', text: "You were in an accident. I found you unconscious near a broken car.", portrait: '/assets/character_portraits/elara.png' },
-    { speaker: 'You', text: "My friends! Did you see them? Were they with me?", portrait: '/assets/character_portraits/hemlock.png' },
-    { speaker: 'Villager', text: "I'm sorry… I didn't see anyone else. But perhaps they are still in the village.", portrait: '/assets/character_portraits/elara.png' },
-    { speaker: 'You', text: "Then I have to find them. Please, can you help me?", portrait: '/assets/character_portraits/hemlock.png' },
+    { speaker: 'Elder', text: "Welcome, traveler. A great mystery has befallen our village. Your friends... they've vanished.", portrait: '/assets/character_portraits/elder.png' },
+    { speaker: 'Elder', text: "Dark forces are at play. Only someone brave can uncover the truth.", portrait: '/assets/character_portraits/elder.png' },
     { speaker: 'Villager', text: "I will guide you. Search the village — maybe you'll find answers there.", portrait: '/assets/character_portraits/elara.png' },
   ];
-
-  // --- 3. ADD USEEFFECT TO LISTEN FOR THE 'gameWon' EVENT ---
-  useEffect(() => {
-    const handleGameWon = (event) => {
-      console.log("React heard the 'gameWon' event from Phaser!", event.detail);
-
-      // Check if the game that just ended was a staking game
-      if (gameConfig && gameConfig.isStaking) {
-        const { elapsedTime } = event.detail;
-        console.log(`Staked game won! Player: ${walletAddress}, Duration: ${elapsedTime}s.`);
-        
-        alert(`Congratulations! Your game has been completed in ${elapsedTime.toFixed(2)} seconds. Your stake is being settled on-chain, and any rewards will be sent directly to your wallet.`);
-        
-        // Return to the main screen
-        setCurrentView('gameMode'); 
-      } else {
-        // For non-staked games, use the existing reward chest logic
-        setGameWonData(event.detail);
-        setShowRewardChest(true); // Show the reward popup
-      }
-    };
-
-    window.addEventListener('gameWon', handleGameWon);
-
-    // Cleanup listener when the component unmounts
-    return () => {
-      window.removeEventListener('gameWon', handleGameWon);
-    };
-  }, [gameConfig, walletAddress]); // Add gameConfig and walletAddress to dependency array
 
   // --- 4. ADD THE HANDLER FUNCTION TO CLAIM THE REWARD ---
   const handleClaimReward = async () => {
