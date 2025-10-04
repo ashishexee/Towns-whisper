@@ -28,6 +28,39 @@ function App() {
   const [showRewardChest, setShowRewardChest] = useState(false);
   const [gameWonData, setGameWonData] = useState(null);
 
+  useEffect(() => {
+    const checkForAbandonedStake = async () => {
+      if (!walletAddress || !userRegistryService) return;
+
+      try {
+        const provider = userRegistryService.provider;
+        const stakingContract = new ethers.Contract(
+          CONTRACT_ADDRESSES.stakingManager,
+          STAKING_MANAGER_ABI,
+          provider
+        );
+
+        const stake = await stakingContract.singlePlayerStakes(walletAddress);
+
+        if (stake.isActive) {
+          alert("An active stake from a previous session was detected. Since the game was not completed, the stake will be forfeited.");
+          
+          const signer = await provider.getSigner();
+          const stakingContractWithSigner = stakingContract.connect(signer);
+          
+          const tx = await stakingContractWithSigner.forfeitStake();
+          await tx.wait();
+          
+          alert("Your previous stake has been forfeited.");
+        }
+      } catch (error) {
+        console.error("Error checking for abandoned stake:", error);
+      }
+    };
+
+    checkForAbandonedStake();
+  }, [walletAddress, userRegistryService]);
+
   const dialogues = [
     { speaker: 'Elder', text: "Welcome, traveler. A great mystery has befallen our village. Your friends... they've vanished.", portrait: '/assets/character_portraits/elder.png' },
     { speaker: 'Elder', text: "Dark forces are at play. Only someone brave can uncover the truth.", portrait: '/assets/character_portraits/elder.png' },

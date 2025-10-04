@@ -62,7 +62,7 @@ export class UIScene extends Phaser.Scene {
 
   createLocationButton() {
     const button = this.add
-      .text(150, this.cameras.main.height - 80, "Choose Location", {
+      .text(170, this.cameras.main.height - 80, "Choose Location", {
         fontFamily: "Arial",
         fontSize: "24px",
         color: "#A9A9A9",
@@ -164,8 +164,21 @@ export class UIScene extends Phaser.Scene {
 
     button.on("pointerdown", () => {
       button.setText("Hold...");
-      giveUpTimer = this.time.delayedCall(3000, () => {
-        window.location.reload();
+      giveUpTimer = this.time.delayedCall(1500, () => {
+        this.scene.stop("HomeScene");
+        this.scene.stop("UIScene");
+        this.scene.start("EndScene", {
+          score: 0,
+          time: this.formatTime(this.elapsedSeconds),
+          guesses: this.homeScene.guessCount,
+          nfts: this.homeScene.nftCount,
+          account: this.account,
+          story: "You have given up on the quest.",
+          isCorrect: false, // This triggers the failure/forfeit scenario
+          isStaking: this.homeScene.isStaking,
+          elapsedTime: this.elapsedSeconds,
+          timeLimit: this.homeScene.timeLimit,
+        });
       });
     });
 
@@ -215,7 +228,6 @@ export class UIScene extends Phaser.Scene {
   showLocationChoices() {
     if (this._locationOverlay) return;
 
-    // Lock location choices if a penalty is due in a staking game.
     if (this.homeScene.isStaking && this.homeScene.guessMade) {
       return;
     }

@@ -105,6 +105,24 @@ contract StakingManager is Ownable, ReentrancyGuard {
     }
 
     /**
+     * @dev Allows a player to forfeit their active single-player stake.
+     * This is used when a player gives up or fails to meet the time challenge.
+     * The staked amount is kept by the contract.
+     */
+    function forfeitStake() external nonReentrant {
+        SinglePlayerStake storage stake = singlePlayerStakes[msg.sender];
+        require(stake.isActive, "No active stake to forfeit.");
+
+        uint256 amountToForfeit = stake.amount;
+
+        // Deactivate stake
+        stake.isActive = false;
+
+        // The forfeited amount stays in the contract balance for owner withdrawal
+        emit StakeForfeited(msg.sender, amountToForfeit);
+    }
+
+    /**
      * @dev Allows a player to deposit funds for in-game actions, like paying a penalty for a wrong guess.
      */
     function depositFundsForHint() external payable {
