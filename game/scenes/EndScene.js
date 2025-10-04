@@ -41,6 +41,7 @@ export class EndScene extends Phaser.Scene {
             scenarioMessage =
               "You were not able to complete the challenge within the time limit";
             showClaimButton = false;
+            this.handleForfeitStake();
             break;
           case "staking_success":
             titleText = "CHALLENGE COMPLETED SUCCESSFULLY!";
@@ -107,6 +108,15 @@ export class EndScene extends Phaser.Scene {
         if (this.endGameData.score > 0) {
           this.submitScore(this.endGameData.score);
         }
+
+        // Display return message for non-staking or failed staking scenarios
+        if (!showClaimButton) {
+          this.add.text(this.centerX, this.centerY + 220, 'Press SPACE to return to the main menu', {
+            fontSize: '18px',
+            color: '#ffffff',
+            align: 'center',
+        }).setOrigin(0.5);
+    }
   }
 
   determineGameScenario() {
@@ -131,6 +141,42 @@ export class EndScene extends Phaser.Scene {
 
     // Default to failed if staking game but didn't complete correctly
     return "staking_failed";
+  }
+
+  async handleForfeitStake() {
+    if (!this.endGameData.isStaking) {
+      console.log("Not a staking game, no forfeit needed.");
+      return;
+    }
+
+    const forfeitStatusText = this.add.text(this.centerX, this.cameras.main.height - 100, 'Forfeiting stake on-chain...', {
+        fontSize: '20px',
+        color: '#ffdddd',
+        backgroundColor: 'rgba(0,0,0,0.7)',
+        padding: { x: 10, y: 5 },
+        align: 'center'
+    }).setOrigin(0.5);
+
+    try {
+        const provider = new ethers.BrowserProvider(window.ethereum);
+        const signer = await provider.getSigner();
+        const stakingContract = new ethers.Contract(
+            CONTRACT_ADDRESSES.stakingManager,
+            STAKING_MANAGER_ABI,
+            signer
+        );
+
+        console.log("Calling forfeitStake() on the contract...");
+        const tx = await stakingContract.forfeitStake();
+        await tx.wait();
+        console.log("Stake forfeited successfully.");
+        forfeitStatusText.setText('Your stake has been forfeited.');
+        forfeitStatusText.setColor('#ffaaaa');
+    } catch (error) {
+        console.error("Failed to forfeit stake:", error);
+        forfeitStatusText.setText('Error forfeiting stake. See console.');
+        forfeitStatusText.setColor('#ff5555');
+    }
   }
 
   createMainMenuButton() {
