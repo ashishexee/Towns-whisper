@@ -90,8 +90,23 @@ contract StakingManager is Ownable, ReentrancyGuard {
         uint256 amount = stake.amount;
         require(amount > 0, "No stake to claim");
 
-        // Calculate the reward: 1.5x the original stake, matching the UI promise.
-        uint256 rewardAmount = (amount * 3) / 2;
+        // Calculate the reward based on the target duration.
+        // Shorter durations yield higher multipliers.
+        // Max Time (20 mins = 1200s) => 1.2x reward
+        // Min Time (1 min = 60s)   => 2.0x reward
+        uint256 targetDuration = stake.targetDuration;
+        uint256 minDuration = 60; // 1 minute
+        uint256 maxDuration = 1200; // 20 minutes
+
+        // Clamp duration to prevent unexpected multipliers
+        if (targetDuration < minDuration) targetDuration = minDuration;
+        if (targetDuration > maxDuration) targetDuration = maxDuration;
+
+        // Linearly interpolate the reward multiplier (fixed-point math with precision 1000)
+        // Multiplier = 2000 - ( (targetDuration - 60) * 800 / 1140 )
+        uint256 multiplier = 2000 - ((targetDuration - minDuration) * 800) / (maxDuration - minDuration);
+        
+        uint256 rewardAmount = (amount * multiplier) / 1000;
         require(address(this).balance >= rewardAmount, "Insufficient contract balance for reward payout.");
 
         // Deactivate stake first

@@ -21,9 +21,18 @@ const ChallengeScreen = ({ onAccept, onDecline, walletAddress }) => {
 
   const rewardAmount = useMemo(() => {
     if (!isStaking) return 0;
-    const rewardMultiplier = 1.5;
+
+    const minMultiplier = 2.0; // At MIN_TIME (1 min)
+    const maxMultiplier = 1.2; // At MAX_TIME (20 mins)
+
+    // Clamp time to the defined min/max
+    const clampedTime = Math.max(MIN_TIME, Math.min(time, MAX_TIME));
+
+    const rewardMultiplier = maxMultiplier + 
+      ((clampedTime - MAX_TIME) / (MIN_TIME - MAX_TIME)) * (minMultiplier - maxMultiplier);
+
     return parseFloat((stakeAmount * rewardMultiplier).toFixed(4));
-  }, [stakeAmount, isStaking]);
+  }, [stakeAmount, isStaking, time]);
 
   const handleAccept = async () => {
     setTxStatus('');

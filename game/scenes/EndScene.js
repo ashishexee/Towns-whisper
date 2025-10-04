@@ -22,7 +22,6 @@ export class EndScene extends Phaser.Scene {
         this.centerX = this.cameras.main.centerX;
         this.centerY = this.cameras.main.centerY;
 
-        // Determine the game scenario and display appropriate content
         let gameScenario = this.determineGameScenario();
         let titleText = "";
         let scenarioMessage = "";
