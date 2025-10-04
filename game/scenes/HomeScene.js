@@ -996,7 +996,31 @@ export class HomeScene extends Phaser.Scene {
 
   update() {
     if (!this.player) return;
-
+    
+    // Add stuck detection
+    const currentPos = { x: this.player.x, y: this.player.y };
+    if (this.lastPlayerPos) {
+      const timeSinceLastMove = this.time.now - (this.lastMoveTime || 0);
+      const distanceMoved = Phaser.Math.Distance.Between(
+        currentPos.x, currentPos.y,
+        this.lastPlayerPos.x, this.lastPlayerPos.y
+      );
+      
+      // If player hasn't moved for 2 seconds while trying to move
+      if (timeSinceLastMove > 2000 && distanceMoved < 5 && 
+          (this.cursors.left.isDown || this.cursors.right.isDown || 
+           this.cursors.up.isDown || this.cursors.down.isDown)) {
+        console.log("Player appears stuck, resetting position");
+        this.player.setPosition(this.initialPlayerPos.x, this.initialPlayerPos.y);
+      }
+    }
+    
+    // Update position tracking
+    this.lastPlayerPos = currentPos;
+    if (velocityX !== 0 || velocityY !== 0) {
+      this.lastMoveTime = this.time.now;
+    }
+    
     if (this.activeMintZone) {
       const playerBounds = this.player.getBounds();
       const zoneBounds = this.activeMintZone.getBounds();
