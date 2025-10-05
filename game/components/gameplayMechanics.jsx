@@ -157,7 +157,7 @@ const GameModeSelectionCard = ({
         </div>
 
         {/* Game Mode Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
+        <div className="grid grid-cols-1 md:grid-cols-1 gap-8 mb-12 max-w-md mx-auto">
           {/* Single Player Card */}
           <div className="bg-gray-800/50 p-8 rounded-xl border-2 border-teal-400/30 hover:border-teal-400/60 transition-all duration-300 hover:scale-105">
             <div className="w-16 h-16 bg-teal-400/20 rounded-full flex items-center justify-center mx-auto mb-6">
@@ -174,44 +174,6 @@ const GameModeSelectionCard = ({
               className="w-full py-3 bg-teal-400 text-gray-900 font-bold rounded-lg hover:bg-teal-300 transition-all duration-300"
             >
               Start Investigation
-            </button>
-          </div>
-
-          {/* Create Room Card */}
-          <div className="bg-gray-800/50 p-8 rounded-xl border-2 border-purple-400/30 hover:border-purple-400/60 transition-all duration-300 hover:scale-105">
-            <div className="w-16 h-16 bg-purple-400/20 rounded-full flex items-center justify-center mx-auto mb-6">
-              <svg className="w-8 h-8 text-purple-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-              </svg>
-            </div>
-            <h3 className="text-2xl font-cinzel text-purple-300 mb-4">Create Room</h3>
-            <p className="text-gray-400 mb-6 font-merriweather">
-              Create a new multiplayer room and invite your friends to join.
-            </p>
-            <button
-              onClick={handleCreateRoom}
-              className="w-full py-3 bg-purple-400 text-gray-900 font-bold rounded-lg hover:bg-purple-300 transition-all duration-300"
-            >
-              Create Room
-            </button>
-          </div>
-
-          {/* Join Room Card */}
-          <div className="bg-gray-800/50 p-8 rounded-xl border-2 border-yellow-400/30 hover:border-yellow-400/60 transition-all duration-300 hover:scale-105">
-            <div className="w-16 h-16 bg-yellow-400/20 rounded-full flex items-center justify-center mx-auto mb-6">
-              <svg className="w-8 h-8 text-yellow-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-              </svg>
-            </div>
-            <h3 className="text-2xl font-cinzel text-yellow-300 mb-4">Join Room</h3>
-            <p className="text-gray-400 mb-6 font-merriweather">
-              Join an existing room with a room code to play with others.
-            </p>
-            <button
-              onClick={handleJoinRoom}
-              className="w-full py-3 bg-yellow-400 text-gray-900 font-bold rounded-lg hover:bg-yellow-300 transition-all duration-300"
-            >
-              Join Room
             </button>
           </div>
         </div>
