@@ -1325,7 +1325,7 @@ export class HomeScene extends Phaser.Scene {
             mintingStatusText.setText(`${itemNameFormatted} minted successfully!`);
             
             this.playerInventory.set(itemName, tokenId);
-            await this.updateInventory();
+            this.events.emit('inventoryUpdated'); // Notify scenes that inventory has changed
         } else {
             console.error("Could not find a valid 'Transfer' event to parse the tokenId.");
             mintingStatusText.setText(`Minted, but item verification failed.`);
@@ -1370,7 +1370,7 @@ export class HomeScene extends Phaser.Scene {
     this.input.keyboard.enabled = false;
     const statusText = this.add.text(
       this.cameras.main.centerX, this.cameras.main.centerY,
-      "Submitting 0.01 ETH penalty...",
+      "Submitting 0.01 0G penalty...",
       { fontSize: "24px", color: "#d4af37", backgroundColor: "rgba(0,0,0,0.8)", padding: { x: 20, y: 10 } }
     ).setOrigin(0.5).setDepth(101).setScrollFactor(0);
 
@@ -1412,7 +1412,7 @@ export class HomeScene extends Phaser.Scene {
     if (villager) {
       console.log(`Unlocking villager: ${villagerName}`);
       villager.requiredItem = null;
-      this.updateInventory();
+      this.events.emit('inventoryUpdated'); // Notify scenes that inventory has changed
     }
   }
 

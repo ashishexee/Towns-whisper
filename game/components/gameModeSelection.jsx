@@ -81,12 +81,12 @@ const GameModeSelection = ({ onPlaySingle, onCreateRoom, onJoinRoom, username, w
                 {/* Balance - Top Left (moved right to avoid overlap) */}
                 <div className="flex items-center gap-2">
                     <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                    <span className="text-sm text-gray-400">ETH Balance:</span>
+                    <span className="text-sm text-gray-400">0G Balance:</span>
                     <span className="font-bold text-teal-300">
                         {isLoadingBalance ? (
                             <span className="animate-pulse">Loading...</span>
                         ) : (
-                            `${balance} ETH`
+                            `${balance} 0G`
                         )}
                     </span>
                 </div>

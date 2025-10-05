@@ -251,7 +251,7 @@ const ChallengeScreen = ({ onAccept, onDecline, walletAddress }) => {
             {/* Stake Amount Slider */}
             <div className="mb-8">
               <h3 className="text-2xl font-cinzel text-yellow-400 mb-4">Set Your Stake</h3>
-              <p className="font-merriweather text-gray-400 mb-4">Choose the amount of ETH you wish to wager.</p>
+              <p className="font-merriweather text-gray-400 mb-4">Choose the amount of 0G you wish to wager.</p>
               <div className="flex items-center justify-center gap-4">
                 <span className="font-bold text-lg">{MIN_STAKE}</span>
                 <input
@@ -261,7 +261,7 @@ const ChallengeScreen = ({ onAccept, onDecline, walletAddress }) => {
                 />
                 <span className="font-bold text-lg">{MAX_STAKE}</span>
               </div>
-              <p className="text-2xl font-bold text-white mt-3">{stakeAmount.toFixed(4)} ETH</p>
+              <p className="text-2xl font-bold text-white mt-3">{stakeAmount.toFixed(4)} 0G</p>
             </div>
 
             {/* Wager Details */}
@@ -269,8 +269,8 @@ const ChallengeScreen = ({ onAccept, onDecline, walletAddress }) => {
                 <h4 className="text-2xl font-cinzel text-yellow-300 mb-4">Wager Details</h4>
                 <div className="grid grid-cols-2 gap-4 text-lg font-merriweather">
                     <div className="text-left"><p className="text-gray-400">Time Limit:</p><p className="font-bold text-white text-xl">{time} minutes</p></div>
-                    <div className="text-right"><p className="text-gray-400">Your Stake:</p><p className="font-bold text-yellow-400 text-xl">{stakeAmount.toFixed(4)} ETH</p></div>
-                    <div className="col-span-2 text-center mt-2"><p className="text-gray-400">Potential Reward:</p><p className="font-bold text-green-400 text-xl">{rewardAmount} ETH</p></div>
+                    <div className="text-right"><p className="text-gray-400">Your Stake:</p><p className="font-bold text-yellow-400 text-xl">{stakeAmount.toFixed(4)} 0G</p></div>
+                    <div className="col-span-2 text-center mt-2"><p className="text-gray-400">Potential Reward:</p><p className="font-bold text-green-400 text-xl">{rewardAmount} 0G</p></div>
                 </div>
             </div>
           </div>

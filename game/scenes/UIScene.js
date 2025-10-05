@@ -433,11 +433,11 @@ export class UIScene extends Phaser.Scene {
     if (!this.locationButton) return;
 
     if (this.homeScene.isStaking && this.homeScene.guessMade) {
-      this.locationButton.setText("Pay 0.01 ETH to Guess Again");
+      this.locationButton.setText("Pay 0.01 0G to Guess Again");
       this.locationButton.setBackgroundColor("#992222");
       this.locationButton.setColor("#ffffff");
     } else if (this.homeScene.wrongLocationChosen) {
-      this.locationButton.setText("Deposit 0.01 ETH");
+      this.locationButton.setText("Deposit 0.01 G");
       this.locationButton.setBackgroundColor("#992222"); // Red color for penalty
       this.locationButton.setColor("#ffffff");
       this.locationButtonEnabled = true; // Keep button interactive for deposit
