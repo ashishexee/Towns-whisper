@@ -136,12 +136,12 @@ const GameModeSelectionCard = ({
                 Address: {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
               </p>
               <p className="text-gray-300 text-sm">
-                Balance: {isLoadingBalance ? 'Loading...' : `${balance} ETH`}
+                Balance: {isLoadingBalance ? 'Loading...' : `${balance} G`}
               </p>
               {parseFloat(claimableReward) > 0 && (
                 <div className="mt-2">
                   <p className="text-yellow-300 text-sm">
-                    Claimable Reward: {claimableReward} ETH
+                    Claimable Reward: {claimableReward} G
                   </p>
                   <button
                     onClick={handleClaimReward}
