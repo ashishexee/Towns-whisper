@@ -1,8 +1,6 @@
 # Towns-whisper
 
-<video src="assets/towns_whisper_walkthrough.mp4" width="100%" controls autoplay muted>
-  Your browser does not support the video tag.
-</video>
+[![Towns Whisper Walkthrough](assets/screenshots/Screenshot%202025-10-05%20215017.png)](assets/towns_whisper_walkthrough.mp4)
 
 Towns-whisper is an immersive 2D mystery-adventure game that fuses AI-driven storytelling with blockchain technology. Each playthrough offers a unique, dynamically generated narrative, challenging players to explore, trade, and compete to unravel secrets in order to rescue their lost friends.
 
@@ -146,7 +144,6 @@ Towns-whisper/
 
 ### Deployed Addresses
 
-*   **User Registry:** `0xe9120a0a7cf5d30ed632967591d3cd9e6a9a2842`
-*   **Game Items:** `0x5b2970c664ed9f62b10c674e796a4e602491c0fb`
-*   **Staking Manager:** `0xcfa11d64286eef34fc5095d776632fc90a8cc04a`
-*   **Trade Manager:** `0x79475AD66448E206F77467A8d0F0F0b23337eA31`
+*   **User Registry:** `0x5133fa99d718111fb6a708bee4ffe935fb529d1b`
+*   **Game Items:** `0xf80c2f2ac5ed19f609071c06efd21eab686436f5`
+*   **Staking Manager:** `0x0d6c4d4046cdf8ca49ffaae4cf10b6bf7f1d7dc9`
