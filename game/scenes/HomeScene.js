@@ -36,6 +36,8 @@ export class HomeScene extends Phaser.Scene {
     this.playerAccountId = null;
     this.wrongLocationChosen = false;
     this.timeLimit = null;
+    this.movingVillagers = null;
+    this.movingVillagerPaths = []; 
   }
 
   init(data) {
@@ -78,6 +80,7 @@ export class HomeScene extends Phaser.Scene {
 
   async create() {
     this.scene.bringToTop("UIScene");
+    this.scene.bringToTop("InventoryScene");
     this.startTime = this.time.now;
     const width = this.cameras.main.width;
     const height = this.cameras.main.height;
@@ -667,6 +670,10 @@ export class HomeScene extends Phaser.Scene {
       }
     });
 
+    // Create moving villagers group
+    this.movingVillagers = this.physics.add.group();
+    this.createMovingVillagers();
+
     this.createObstacle(6, 0.3, "crop03", 2, 2);
 
     this.createPlayer(1, 4.5);
@@ -675,6 +682,13 @@ export class HomeScene extends Phaser.Scene {
     this.cameras.main.setFollowOffset(0, 0);
     this.cameras.main.setLerp(0.1, 0.1);
     this.cameras.main.setZoom(1);
+    this.tweens.add({
+      targets : this.cameras.main,
+      zoom : 1.7,
+      duration : 4000,
+      ease : 'Sine.easeInOut',
+      delay : 100
+    })
 
     const worldWidth =
       Math.ceil(this.cameras.main.width / this.tileSize) * this.tileSize;
@@ -994,7 +1008,125 @@ export class HomeScene extends Phaser.Scene {
     }
   }
 
-  update() {
+  createMovingVillagers() {
+    // Define 4 different patrol routes on walkable paths
+    const movingVillagerData = [
+      {
+        // Villager 1: Patrols the main horizontal path
+        path: [
+          { x: 3 * this.tileSize, y: 5 * this.tileSize },
+          { x: 15 * this.tileSize, y: 5 * this.tileSize },
+          { x: 25 * this.tileSize, y: 5 * this.tileSize },
+          { x: 15 * this.tileSize, y: 5 * this.tileSize }
+        ],
+        texture: "villager02",
+        scale: 0.06,
+        speed: 30
+      },
+      {
+        // Villager 2: Patrols around the upper area
+        path: [
+          { x: 9 * this.tileSize, y: 2 * this.tileSize },
+          { x: 12 * this.tileSize, y: 2 * this.tileSize },
+          { x: 12 * this.tileSize, y: 4 * this.tileSize },
+          { x: 9 * this.tileSize, y: 4 * this.tileSize }
+        ],
+        texture: "villager02",
+        scale: 0.065,
+        speed: 25
+      },
+      {
+        // Villager 3: Patrols the vertical path on the right
+        path: [
+          { x: 16 * this.tileSize, y: 6 * this.tileSize },
+          { x: 16 * this.tileSize, y: 12 * this.tileSize },
+          { x: 16 * this.tileSize, y: 18 * this.tileSize },
+          { x: 16 * this.tileSize, y: 12 * this.tileSize }
+        ],
+        texture: "villager03",
+        scale: 0.07,
+        speed: 35
+      },
+      {
+        // Villager 4: Patrols the lower horizontal area
+        path: [
+          { x: 2 * this.tileSize, y: 11 * this.tileSize },
+          { x: 8 * this.tileSize, y: 11 * this.tileSize },
+          { x: 14 * this.tileSize, y: 11 * this.tileSize },
+          { x: 8 * this.tileSize, y: 11 * this.tileSize }
+        ],
+        texture: "villager04",
+        scale: 0.068,
+        speed: 28
+      }
+    ];
+
+    movingVillagerData.forEach((data, index) => {
+      this.createMovingVillager(data.path, data.texture, data.scale, data.speed, index);
+    });
+  }
+
+  createMovingVillager(path, texture, scale, speed, index) {
+    // Create the villager sprite at the first path point
+    const villager = this.movingVillagers.create(path[0].x, path[0].y, texture);
+    
+    villager
+      .setOrigin(0.5)
+      .setDisplaySize(32, 32)
+      .setScale(scale)
+      .setPipeline("Light2D")
+      .setDepth(5); // Lower depth than player to appear behind
+
+    // Store path and movement data
+    villager.patrolPath = path;
+    villager.currentPathIndex = 0;
+    villager.moveSpeed = speed;
+    villager.isMoving = false;
+    villager.movingVillagerIndex = index;
+    
+    // Start movement
+    this.moveVillagerToNextPoint(villager);
+  }
+
+  moveVillagerToNextPoint(villager) {
+    if (!villager || !villager.patrolPath) return;
+
+    const currentPoint = villager.patrolPath[villager.currentPathIndex];
+    const nextIndex = (villager.currentPathIndex + 1) % villager.patrolPath.length;
+    const nextPoint = villager.patrolPath[nextIndex];
+
+    // Calculate distance and time for smooth movement
+    const distance = Phaser.Math.Distance.Between(
+      currentPoint.x, currentPoint.y,
+      nextPoint.x, nextPoint.y
+    );
+    const duration = (distance / villager.moveSpeed) * 1000;
+
+    villager.isMoving = true;
+
+    // Create tween for smooth movement
+    this.tweens.add({
+      targets: villager,
+      x: nextPoint.x,
+      y: nextPoint.y,
+      duration: duration,
+      ease: 'Linear',
+      onComplete: () => {
+        villager.currentPathIndex = nextIndex;
+        villager.isMoving = false;
+        
+        // Wait a bit before moving to next point
+        this.time.delayedCall(
+          Phaser.Math.Between(1000, 3000), // Random pause between 1-3 seconds
+          () => {
+            this.moveVillagerToNextPoint(villager);
+          }
+        );
+      }
+    });
+  }
+
+  async update() {
     if (!this.player) return;
     
     // Add stuck detection
@@ -1162,6 +1294,40 @@ export class HomeScene extends Phaser.Scene {
 
     if (Phaser.Input.Keyboard.JustDown(this.enterKey) && this.nearbyVillager) {
       this.startConversation();
+    }
+
+    // Handle moving villagers interaction detection (but don't allow interaction)
+    if (this.movingVillagers) {
+      this.movingVillagers.getChildren().forEach((movingVillager) => {
+        const distance = Phaser.Math.Distance.Between(
+          this.player.x,
+          this.player.y,
+          movingVillager.x,
+          movingVillager.y
+        );
+        
+        // If player gets too close, show a brief message that they can't interact
+        if (distance < 40 && !movingVillager.showingMessage) {
+          movingVillager.showingMessage = true;
+          
+          const noInteractText = this.add
+            .text(movingVillager.x, movingVillager.y - 40, "Busy walking...", {
+              fontFamily: "Arial",
+              fontSize: "12px",
+              color: "#cccccc",
+              backgroundColor: "rgba(0,0,0,0.5)",
+              padding: { x: 4, y: 2 },
+            })
+            .setOrigin(0.5)
+            .setDepth(32);
+
+          // Remove the text after a short time
+          this.time.delayedCall(1500, () => {
+            noInteractText.destroy();
+            movingVillager.showingMessage = false;
+          });
+        }
+      });
     }
   }
 
@@ -1539,7 +1705,6 @@ export class HomeScene extends Phaser.Scene {
     if (this.tokenBalanceElement && this.tokenBalanceElement.parentNode) {
         this.tokenBalanceElement.parentNode.removeChild(this.tokenBalanceElement);
     }
-    
   }
 
 }

@@ -103,6 +103,15 @@ export class LoadingScene extends Phaser.Scene {
     this.load.audio("background_music", "assets/music/background_audio.mp3");
     this.load.audio("villager_accept", "assets/music/villager_accept.ogg");
     this.load.audio("thunder", "assets/music/thunder.mp3");
+    this.load.image("FISHING_ROD", "assets/images/items/fishing_rod.png");
+    this.load.image("AXE", "assets/images/items/axe.png");
+    this.load.image("SHOVEL", "assets/images/items/shovel.png");
+    this.load.image("LANTERN", "assets/images/items/lantern.png");
+    this.load.image("PICKAXE", "assets/images/items/pickaxe.png");
+    this.load.image("HAMMER", "assets/images/items/hammer.png");
+    this.load.image("BUCKET", "assets/images/items/bucket.png");
+    this.load.image("SCYTHE", "assets/images/items/scythe.png");
+
 
 
 
@@ -143,14 +152,7 @@ export class LoadingScene extends Phaser.Scene {
   }
 
   create() {
-    this.createLoadingBar();
-    this.startFileLoad();
-
-    this.load.on('complete', () => {
-      this.time.delayedCall(500, () => {
-        // Pass the original, complete data object to the next scene
-        this.scene.start(this.nextScene, this.dataToPass);
-      });
-    });
+    // This method can be left empty.
+    // All loading logic and scene transition is handled in the 'preload' method.
   }
 }
