@@ -89,13 +89,13 @@ const startServer = async () => {
         }
 
         const requiredLedgerBalance = ethers.parseEther(MINIMUM_DEPOSIT_AMOUNT);
-        if (!computeLedger || computeLedger.totalBalance < requiredLedgerBalance) {
-                console.log("Ledger is empty or has insufficient funds. A deposit is required.");
-                
-                const walletBalance = await provider.getBalance(wallet.address);
-                const amountToDeposit = requiredLedgerBalance - (computeLedger ? computeLedger.totalBalance : 0n);
-                const amountToDepositEther = ethers.formatEther(amountToDeposit);
+        const amountToDeposit = requiredLedgerBalance - (computeLedger ? computeLedger.totalBalance : 0n);
 
+        if (amountToDeposit > 0n) {
+                const amountToDepositEther = ethers.formatEther(amountToDeposit);
+                const walletBalance = await provider.getBalance(wallet.address);
+
+                console.log("Ledger is empty or has insufficient funds. A deposit is required.");
                 console.log(`Wallet Balance: ${ethers.formatEther(walletBalance)} OG`);
                 console.log(`Required Deposit / Top-up: ${amountToDepositEther} OG`);
 
@@ -106,12 +106,15 @@ const startServer = async () => {
                 }
 
                 if (!computeLedger) {
-                        console.log("Depositing funds to create the on-chain compute ledger...");
+                    console.log("Creating on-chain compute ledger with deposit...");
+                    await broker.ledger.addLedger(parseFloat(amountToDepositEther));
                 } else {
-                        console.log("Depositing funds to top up the on-chain compute ledger...");
+                    console.log("Topping up compute ledger...");
+                    await broker.ledger.depositFund(parseFloat(amountToDepositEther));
                 }
-                await broker.ledger.addLedger(Number(amountToDepositEther));
                 console.log("Successfully deposited funds!");
+        } else {
+            console.log("Ledger already funded sufficiently.");
         }
 
         const finalLedger = await broker.ledger.getLedger();
