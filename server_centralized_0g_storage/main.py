@@ -9,8 +9,9 @@ from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import requests # Ensure requests is imported
-
+import json
 from schemas import *
+from datetime import datetime
 from game_logic.engine import GameEngine
 from game_logic.state_manager import GameState
 # Import our new Hedera service function
