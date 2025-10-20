@@ -5,25 +5,63 @@ import fs from "fs/promises";
 import path from "path";
 import os from "os";
 
+// +++ NEW: Add gRPC imports
+import grpc from '@grpc/grpc-js';
+import protoLoader from '@grpc/proto-loader';
+
 dotenv.config();
 
+// --- Existing constants ---
 const INDEXER_RPC = "https://indexer-storage-testnet-turbo.0g.ai";
 const RPC_URL = process.env.RPC_ENDPOINT || "https://evmrpc-testnet.0g.ai";
 const DIALOGUE_MAP_FILE = path.join(os.tmpdir(), '0g-dialogue-map.json');
 
-export class StorageManager {
-  constructor() {
-    this.indexer = new Indexer(INDEXER_RPC);
-    const provider = new ethers.JsonRpcProvider(RPC_URL);
-    this.signer = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
-    this.provider = provider;
-    this.evmRpc = RPC_URL;
-    
-    this.dialogueMap = new Map();
+// +++ NEW: Add DA constants
+const DA_PROTO_PATH = path.resolve('./proto/disperser.proto');
+const DA_NODE_ADDRESS = 'localhost:51001';
 
-    this.initializeAndLog();
-    console.log("✅ 0G Storage Manager initialized successfully.");
-  }
+
+export class StorageManager {
+    constructor() {
+        // --- Existing initializations ---
+        this.indexer = new Indexer(INDEXER_RPC);
+        const provider = new ethers.JsonRpcProvider(RPC_URL);
+        this.signer = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
+        this.provider = provider;
+        this.evmRpc = RPC_URL;
+        this.dialogueMap = new Map();
+
+        // +++ NEW: Initialize DA Client
+        this.daClient = this._initializeDaClient();
+        
+        this.initializeAndLog();
+        console.log("✅ 0G Storage & DA Manager initialized successfully.");
+    }
+    
+    // +++ NEW: Add a method to initialize the gRPC client for DA
+    _initializeDaClient() {
+        try {
+            const packageDefinition = protoLoader.loadSync(DA_PROTO_PATH, {
+                keepCase: true,
+                longs: String,
+                enums: String,
+                defaults: true,
+                oneofs: true,
+            });
+            const daProto = grpc.loadPackageDefinition(packageDefinition).disperser;
+            const client = new daProto.Disperser(DA_NODE_ADDRESS, grpc.credentials.createInsecure());
+            console.log(`🔗 Connected to 0g DA Client at ${DA_NODE_ADDRESS}`);
+            return client;
+        } catch (error) {
+            console.error("❌ Failed to initialize 0g DA Client. Is the Docker container running?", error);
+            // Return a mock client to prevent crashes if the DA client isn't running
+            return {
+                disperseBlob: () => {
+                    console.error("DA Client not available.");
+                }
+            };
+        }
+    }
 
   async initializeAndLog() {
     await this._loadDialogueMap();
@@ -113,6 +151,40 @@ export class StorageManager {
     }
   }
 
+   async makeDataAvailable(data, description = "Game Event") {
+        if (!this.daClient || typeof this.daClient.disperseBlob !== 'function') {
+            throw new Error("0g DA Client is not initialized or available.");
+        }
+
+        console.log(`🚀 Dispersing data to 0g DA: ${description}`);
+
+        const dataToDisperse = {
+            timestamp: new Date().toISOString(),
+            description: description,
+            payload: data,
+        };
+
+        const dataBlob = Buffer.from(JSON.stringify(dataToDisperse));
+        const accountId = "0xFB1991B8B2031eE3a163CC0f5dFce155ab200f6d";
+        console.log(`📦 Blob size: ${dataBlob.length} bytes`);
+
+        return new Promise((resolve, reject) => {
+            const request = {
+                data: dataBlob,
+                account_id: accountId,
+            };
+
+            this.daClient.disperseBlob(request, (error, response) => {
+                if (error) {
+                    console.error('❌ 0g DA Dispersal Error:', error.details);
+                    return reject(new Error('Failed to disperse data to 0g DA.'));
+                }
+                console.log('✅ 0g DA: Dispersal request successful.', response);
+                resolve(response);
+            });
+        });
+    }
+
   async saveFullDialogueHistory(walletAddress, fullHistory) {
     try {
       const data = typeof fullHistory === "string" ? fullHistory : JSON.stringify(fullHistory);
@@ -156,6 +228,14 @@ export class StorageManager {
 
       console.log(`🗃️ Saved dialogue for ${walletAddress}`);
       console.log(`   Root Hash: ${result.rootHash}`);
+
+      // 2. (Optional) Make a critical part of the dialogue available on 0g DA
+            if (dialogueObj.isCriticalEvent) {
+                await this.makeDataAvailable(
+                    { wallet: walletAddress, dialogue: dialogueObj },
+                    "Critical Dialogue Event"
+                );
+            }
       
       return true;
     } catch (err) {

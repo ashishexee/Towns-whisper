@@ -1,7 +1,5 @@
 # Towns-whisper
 
-[![Towns Whisper Walkthrough](assets/screenshots/Screenshot%202025-10-05%20215017.png)](assets/towns_whisper_walkthrough.mp4)
-
 Towns-whisper is an immersive 2D mystery-adventure game that fuses AI-driven storytelling with blockchain technology. Each playthrough offers a unique, dynamically generated narrative, challenging players to explore, trade, and compete to unravel secrets in order to rescue their lost friends.
 
 ## Storyline
@@ -35,6 +33,27 @@ We use 0G's decentralized storage solution to persist player dialogue history, e
 2.  **`server_centralized_0g_storage`:** This server acts as a client to the `0g_storage_service`. It provides a high-level API for the main application to interact with, abstracting away the complexities of the underlying storage mechanism. This separation of concerns makes the storage logic more modular and easier to maintain.
 
 By using 0G storage, we can provide a more robust and resilient gaming experience, where players can be confident that their progress is securely stored and always accessible.
+
+### 0g Data Availability (DA) Flow
+
+The 0G Data Availability layer ensures that the dialogue history is not only stored but is also verifiable and resilient against data loss. The process involves several components working in concert:
+
+1.  **Game Interaction & State Management:** The player's journey begins in the React frontend (`game` directory). All dialogue choices are sent to the Python backend (`server_centralized_0g_storage`), which compiles the complete session history.
+
+2.  **Bridge to 0G:** The Python server sends the dialogue data to a Node.js microservice (`0g_storage_service`). This service, using its `storageManager.js`, formats the data into a "blob" for the network.
+
+3.  **Local Client Submission:** The Node.js service communicates via gRPC with the local `0g-da-client`, which handles the complex cryptographic operations.
+
+4.  **Dispersal, Encoding, and Batching:**
+    *   The **Disperser** (`disperser.md`) is the entry point, validating the blob and preparing it for processing.
+    *   The **Encoder** (`0g-da-encoder`) applies erasure coding, ensuring data can be reconstructed even if parts are lost.
+    *   The **Batcher** (`batcher.md`) groups multiple blobs, builds a Merkle tree, and generates a single Merkle root hash.
+
+5.  **On-Chain Commitment & Storage:** This Merkle root is committed to the 0G Storage smart contract on the blockchain. This anchors a large amount of off-chain data in a verifiable and efficient manner. The full encoded data is sent to 0G Storage Nodes.
+
+6.  **Retrieval:** When the player returns, their dialogue history can be securely fetched and reconstructed using the **Retriever** service (`0g-da-client/docs/architecture/retriever.md`).
+
+This flow guarantees that player data is not only saved but is also redundantly stored and verifiable on-chain, providing a high degree of trust and availability.
 
 ## Screenshots
 

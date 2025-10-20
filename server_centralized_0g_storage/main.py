@@ -20,6 +20,8 @@ from mirror_node_service import mirror_service
 # --- MODIFIED IMPORT ---
 from storage_client import get_dialogue_history, save_full_dialogue_history
 # -------------------------
+from dotenv import load_dotenv
+load_dotenv() 
 
 app = FastAPI()
 

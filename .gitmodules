@@ -4,3 +4,9 @@
 [submodule "contracts_eth/lib/openzeppelin-contracts"]
 	path = contracts_eth/lib/openzeppelin-contracts
 	url = https://github.com/OpenZeppelin/openzeppelin-contracts
+[submodule "0g-da-client"]
+	path = 0g-da-client
+	url = https://github.com/0gfoundation/0g-da-client
+[submodule "0g-da-encoder"]
+	path = 0g-da-encoder
+	url = https://github.com/0glabs/0g-da-encoder.git

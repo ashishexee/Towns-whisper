@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+package disperser;
+
+// The Disperser service definition.
+service Disperser {
+  // Disperses a blob of data.
+  rpc DisperseBlob(DisperseBlobRequest) returns (DisperseBlobReply);
+}
+
+// The request message containing the data to be dispersed.
+message DisperseBlobRequest {
+  // The data to be dispersed.
+  bytes data = 1;
+
+  // The account ID of the data owner.
+  // This account will be charged for the data dispersal.
+  string account_id = 2;
+}
+
+// The response message containing the dispersal result.
+message DisperseBlobReply {
+  enum Result {
+    // The dispersal was successful.
+    SUCCESS = 0;
+    // The dispersal failed.
+    FAILURE = 1;
+  }
+  // The result of the dispersal.
+  Result result = 1;
+  // The request ID of the dispersal.
+  // This can be used to track the status of the dispersal.
+  string request_id = 2;
+}
