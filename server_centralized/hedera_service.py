@@ -30,7 +30,6 @@ class HederaService:
             else:
                 self.treasury_private_key = None
                 self.demo_mode = True
-                print("⚠️ Running in DEMO MODE - no private key found")
                 
             self.rune_token_id = '0.0.6913517'
             
