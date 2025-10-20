@@ -41,89 +41,26 @@ The 0G Data Availability layer ensures that critical game events are cryptograph
 #### Architecture Overview
 
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│                    FRONTEND (React + Phaser)                        │
-│  ┌──────────────────────────────────────────────────────────────┐  │
-│  │  game/services/daService.js                                   │  │
-│  │  • Fire-and-forget event logging                              │  │
-│  │  • Non-blocking (game never pauses for DA)                    │  │
-│  │  • Retrieval API for historical events                        │  │
-│  └──────────────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────────┘
-                              │
-                              │ HTTP POST (localhost:3002/da/disperse)
-                              ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│              0G STORAGE SERVICE (Node.js Express)                   │
-│  ┌──────────────────────────────────────────────────────────────┐  │
-│  │  storageManager.js                                            │  │
-│  │  • Wraps game events with metadata (timestamp, description)  │  │
-│  │  • Serializes to binary buffer                                │  │
-│  │  • Manages gRPC communication with DA client                  │  │
-│  │  • Tracks request_id → wallet mappings for retrieval         │  │
-│  └──────────────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────────┘
-                              │
-                              │ gRPC (disperseBlob) - port 51001
-                              ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│           0G-DA-CLIENT (Docker Container - Go Binary)               │
-│  ┌──────────────────────────────────────────────────────────────┐  │
-│  │  Disperser                                                     │  │
-│  │  • Receives blob via gRPC (proto/disperser.proto)            │  │
-│  │  • Validates blob size and format                            │  │
-│  │  • Stores in memory DB for batching                          │  │
-│  └──────────────────────────────────────────────────────────────┘  │
-│  ┌──────────────────────────────────────────────────────────────┐  │
-│  │  Batcher                                                       │  │
-│  │  • Groups blobs every 3 seconds (configurable)               │  │
-│  │  • Sends batch to encoder for cryptographic processing       │  │
-│  │  • Builds Merkle tree from encoded chunks                    │  │
-│  └──────────────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────────┘
-                              │
-                              │ gRPC (EncodeBlob) - port 34000
-                              │ host.docker.internal (Docker → WSL bridge)
-                              ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│           0G-DA-ENCODER (WSL Native Process - Rust Binary)          │
-│  ┌──────────────────────────────────────────────────────────────┐  │
-│  │  Encoding Service                                             │  │
-│  │  • Applies Reed-Solomon erasure coding                       │  │
-│  │  • Creates KZG polynomial commitments                        │  │
-│  │  • Generates cryptographic proofs                            │  │
-│  │  • Returns encoded chunks to DA client                       │  │
-│  └──────────────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────────┘
-                              │
-                              │ Encoded data + proofs returned
-                              ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│           0G-DA-CLIENT (Continued - Signing & Finalization)         │
-│  ┌──────────────────────────────────────────────────────────────┐  │
-│  │  Signer                                                        │  │
-│  │  • Collects signatures from DA signers                        │  │
-│  │  • Verifies signature threshold (quorum)                      │  │
-│  └──────────────────────────────────────────────────────────────┘  │
-│  ┌──────────────────────────────────────────────────────────────┐  │
-│  │  Finalizer                                                     │  │
-│  │  • Submits Merkle root to 0G blockchain                       │  │
-│  │  • Waits for transaction finality (50 blocks)                │  │
-│  │  • Confirms on-chain commitment                               │  │
-│  └──────────────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────────┘
-                              │
-                              │ Transaction to 0x857C...Aa9 (Entrance Contract)
-                              ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                  0G BLOCKCHAIN (Newton Testnet)                     │
-│  ┌──────────────────────────────────────────────────────────────┐  │
-│  │  On-Chain Data Availability Contract                          │  │
-│  │  • Stores Merkle root commitment                              │  │
-│  │  • Timestamp and block number anchoring                       │  │
-│  │  • Immutable proof of data availability                       │  │
-│  └──────────────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────────┘
+Frontend (daService.js)
+    ↓ HTTP POST
+0G Storage Service (storageManager.js)
+    ↓ gRPC (disperseBlob)
+0G-DA-Client (Docker)
+    ├─ Disperser: Receives & batches blobs
+    ├─ Batcher: Creates batches every 3s
+    └─ Sends to encoder →
+                         ↓ gRPC (EncodeBlob)
+0G-DA-Encoder (WSL - Rust)
+    ├─ Reed-Solomon erasure coding
+    ├─ KZG cryptographic commitments
+    └─ Returns encoded chunks →
+                                ↓
+0G-DA-Client (Continued)
+    ├─ Signer: Collects DA signer signatures
+    └─ Finalizer: Submits Merkle root to blockchain
+ ↓
+0G Blockchain (Newton Testnet)
+    └─ On-chain commitment stored
 ```
 
 #### Critical Game Events Logged to DA
