@@ -34,26 +34,119 @@ We use 0G's decentralized storage solution to persist player dialogue history, e
 
 By using 0G storage, we can provide a more robust and resilient gaming experience, where players can be confident that their progress is securely stored and always accessible.
 
-### 0g Data Availability (DA) Flow
+### 0g Data Availability (DA) Implementation
 
-The 0G Data Availability layer ensures that the dialogue history is not only stored but is also verifiable and resilient against data loss. The process involves several components working in concert:
+The 0G Data Availability layer ensures that critical game events are cryptographically secured, verifiable, and resilient against data loss or censorship. Our implementation creates an immutable audit trail of player actions that can be independently verified on-chain.
 
-1.  **Game Interaction & State Management:** The player's journey begins in the React frontend (`game` directory). All dialogue choices are sent to the Python backend (`server_centralized_0g_storage`), which compiles the complete session history.
+#### Architecture Overview
 
-2.  **Bridge to 0G:** The Python server sends the dialogue data to a Node.js microservice (`0g_storage_service`). This service, using its `storageManager.js`, formats the data into a "blob" for the network.
+```
+Frontend (daService.js)
+    ↓ HTTP POST
+0G Storage Service (storageManager.js)
+    ↓ gRPC (disperseBlob)
+0G-DA-Client (Docker)
+    ├─ Disperser: Receives & batches blobs
+    ├─ Batcher: Creates batches every 3s
+    └─ Sends to encoder →
+                         ↓ gRPC (EncodeBlob)
+0G-DA-Encoder (WSL - Rust)
+    ├─ Reed-Solomon erasure coding
+    ├─ KZG cryptographic commitments
+    └─ Returns encoded chunks →
+                                ↓
+0G-DA-Client (Continued)
+    ├─ Signer: Collects DA signer signatures
+    └─ Finalizer: Submits Merkle root to blockchain
+ ↓
+0G Blockchain (Newton Testnet)
+    └─ On-chain commitment stored
+```
 
-3.  **Local Client Submission:** The Node.js service communicates via gRPC with the local `0g-da-client`, which handles the complex cryptographic operations.
+#### Critical Game Events Logged to DA
 
-4.  **Dispersal, Encoding, and Batching:**
-    *   The **Disperser** (`disperser.md`) is the entry point, validating the blob and preparing it for processing.
-    *   The **Encoder** (`0g-da-encoder`) applies erasure coding, ensuring data can be reconstructed even if parts are lost.
-    *   The **Batcher** (`batcher.md`) groups multiple blobs, builds a Merkle tree, and generates a single Merkle root hash.
+We disperse the following events to ensure a complete, verifiable game history:
 
-5.  **On-Chain Commitment & Storage:** This Merkle root is committed to the 0G Storage smart contract on the blockchain. This anchors a large amount of off-chain data in a verifiable and efficient manner. The full encoded data is sent to 0G Storage Nodes.
+1. **Player Authentication**
+   - New user registration
+   - Returning user login sessions
 
-6.  **Retrieval:** When the player returns, their dialogue history can be securely fetched and reconstructed using the **Retriever** service (`0g-da-client/docs/architecture/retriever.md`).
+2. **Game Lifecycle**
+   - Single-player game start (with difficulty and staking details)
+   - Multiplayer room creation
+   - Player joining multiplayer rooms
+   - Multiplayer game start (with full player roster)
 
-This flow guarantees that player data is not only saved but is also redundantly stored and verifiable on-chain, providing a high degree of trust and availability.
+3. **Economic Events**
+   - Stake forfeiture (abandoned games)
+   - Reward claims (with Hedera schedule ID)
+
+4. **Multiplayer Coordination**
+   - Room creation metadata
+   - Player join events
+   - Game initialization parameterss
+
+#### Data Flow Example: Player Wins Game
+
+1. **Frontend**: Player defeats final boss
+   ```javascript
+   daService.disperseCriticalEvent(
+     { player: "0xABC...", outcome: "victory", time: 450 },
+     "Player Victory",
+     "0xABC...",
+     "GAME_VICTORY"
+   );
+   ```
+
+2. **Storage Service**: Wraps with metadata, sends via gRPC
+   ```json
+   {
+     "timestamp": "2025-10-20T12:34:56Z",
+     "description": "Player Victory",
+     "data": { "player": "0xABC...", "outcome": "victory", "time": 450 }
+   }
+   ```
+
+3. **DA Client**: Batches with other events
+   ```
+   Batch #1234: [Player Victory, Room Created, User Login]
+   Merkle Root: 0xDEADBEEF...
+   ```
+
+4. **Encoder**: Applies erasure coding
+   ```
+   Original: 250 bytes → Encoded: 500 bytes (2x redundancy)
+   Chunks: 10 pieces distributed to storage nodes
+   ```
+
+5. **Blockchain**: Merkle root committed
+   ```
+   Transaction: 0x789ABC...
+   Block: 2,975,123
+   Status: FINALIZED
+   ```
+
+6. **Result**: Returns `request_id` to frontend
+   ```json
+   {
+     "result": "SUCCESS",
+     "request_id": "3c66a548...81a9-31373..."
+   }
+   ```
+
+#### Retrieval Flow
+
+When a player returns, their history can be reconstructed:
+
+```javascript
+// 1. Get all request_ids for the player
+const events = await daService.getPlayerEvents(walletAddress);
+// Returns: { GAME_START: [...], GAME_VICTORY: [...], USER_LOGIN: [...] }
+
+// 2. Retrieve specific event data
+const victoryData = await daService.retrieveBlob(request_id);
+// Returns: { player: "0xABC...", outcome: "victory", time: 450 }
+```
 
 ## Screenshots
 
