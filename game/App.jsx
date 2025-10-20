@@ -12,6 +12,8 @@ import UserRegistration from './components/UserRegistration';
 import { UserRegistryService } from './utils/userRegistry';
 import RoomLobby from './components/RoomLobby';
 import { CONTRACT_ADDRESSES, STAKING_MANAGER_ABI } from '../contracts_eth/config';
+import { daService } from './services/daService'; // 1. Import the DA service
+
 function App() {
   const [currentView, setCurrentView] = useState('landing');
   const [gameConfig, setGameConfig] = useState(null);
@@ -49,7 +51,17 @@ function App() {
           const stakingContractWithSigner = stakingContract.connect(signer);
           
           const tx = await stakingContractWithSigner.forfeitStake();
-          await tx.wait();
+          const receipt = await tx.wait();
+          
+          // 2. Disperse stake forfeiture event to DA
+          daService.disperseCriticalEvent(
+            { 
+              player: walletAddress, 
+              stakeAmount: ethers.formatEther(stake.amount),
+              txHash: receipt.hash 
+            },
+            "Player Stake Forfeited"
+          );
           
           alert("Your previous stake has been forfeited.");
         }
@@ -83,6 +95,18 @@ function App() {
     if (result && result.status === 'success') {
       alert("Success! Your reward has been scheduled. Check your wallet in about 30 minutes.");
       console.log("Scheduling successful, scheduleId:", result.schedule_id);
+
+      // 3. Disperse reward claim event to DA
+      daService.disperseCriticalEvent(
+        {
+          player: walletAddress,
+          scheduleId: result.schedule_id,
+          isStakingGame: isStakingGame,
+          gameDuration: actualDuration
+        },
+        "Player Reward Claimed"
+      );
+
     } else {
       alert("There was an error scheduling your reward. Please try again.");
       console.error("Failed to schedule reward:", result);
@@ -113,6 +137,11 @@ function App() {
         setUsername(userInfo.username);
         setCurrentView('gameMode');
         console.log("Returning user:", userInfo.username);
+        // DA EVENT: Log when a returning user connects
+  daService.disperseCriticalEvent(
+    { player: address, username: userInfo.username },
+    "Returning User Connected"
+  );
       } else {
         setCurrentView('registration');
         console.log("New user, showing registration");
@@ -132,6 +161,12 @@ function App() {
     setUsername(registeredUsername);
     setCurrentView('gameMode');
     console.log("User registered successfully:", registeredUsername);
+
+    // 4. Disperse new user registration event to DA
+    daService.disperseCriticalEvent(
+      { player: walletAddress, username: registeredUsername },
+      "New User Registered"
+    );
   };
 
   const handleRegistrationCancel = () => {
@@ -206,6 +241,17 @@ function App() {
     });
     setCurrentView('game');
     
+    // 5. Disperse game start event to DA
+    daService.disperseCriticalEvent(
+      {
+        player: walletAddress,
+        difficulty: challengeConfig.difficulty,
+        isStaking: challengeConfig.isStaking,
+        stakeAmount: challengeConfig.stakeAmount
+      },
+      "Single-Player Game Started"
+    );
+
     console.log("Game config set:", {
       difficulty: challengeConfig.difficulty,
       account: walletAddress
@@ -266,14 +312,6 @@ function App() {
         <source src="/assets/cut-scene/landing_bg_video.mp4" type="video/mp4" />
         Your browser does not support the video tag.
       </video>
-
-      {/* --- 5. RENDER THE REWARD CHEST CONDITIONALLY --- */}
-      {showRewardChest && (
-        <RewardChest
-          onClaim={handleClaimReward}
-          onClose={() => setShowRewardChest(false)}
-        />
-      )}
 
       <div style={{ position: 'relative', zIndex: 10, backgroundColor: 'rgba(0,0,0,0.45)' }}>
         <main>
