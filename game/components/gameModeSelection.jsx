@@ -116,7 +116,7 @@ const GameModeSelection = ({ onPlaySingle, onCreateRoom, onJoinRoom, username, w
                     How would you like to uncover the mystery?
                 </p>
 
-                <div className="grid grid-cols-1 md:grid-cols-1 gap-8 max-w-md mx-auto">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
                     <GameModeCard
                         title="Single Player"
                         description="Uncover the village's secrets on your own and solve the mystery."
@@ -125,6 +125,24 @@ const GameModeSelection = ({ onPlaySingle, onCreateRoom, onJoinRoom, username, w
                         icon={<SinglePlayerIcon />}
                         borderColor="border-teal-400/50 hover:border-teal-400/60"
                         buttonColor="bg-teal-400 hover:bg-teal-300 hover:shadow-teal-300/50"
+                    />
+                    <GameModeCard
+                        title="Create a Room"
+                        description="Forge a new path and invite friends to join your quest."
+                        buttonText="Create Room"
+                        onButtonClick={onCreateRoom}
+                        icon={<CreateRoomIcon />}
+                        borderColor="border-purple-400/50 hover:border-purple-400/60"
+                        buttonColor="bg-purple-400 hover:bg-purple-300 hover:shadow-purple-300/50"
+                    />
+                    <GameModeCard
+                        title="Join a Room"
+                        description="Enter an existing room code to join a game with others."
+                        buttonText="Join Room"
+                        onButtonClick={onJoinRoom}
+                        icon={<JoinRoomIcon />}
+                        borderColor="border-yellow-400/50 hover:border-yellow-400/60"
+                        buttonColor="bg-yellow-400 hover:bg-yellow-300 hover:shadow-yellow-300/50"
                     />
                 </div>
             </div>

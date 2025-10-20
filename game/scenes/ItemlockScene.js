@@ -28,111 +28,124 @@ export class ItemLockScene extends Phaser.Scene {
     const width = this.cameras.main.width;
     const height = this.cameras.main.height;
 
+    // Semi-transparent background overlay
     this.add
-      .rectangle(0, 0, width, height, 0x000000, 0.7)
+      .rectangle(0, 0, width, height, 0x000000, 0.8)
       .setOrigin(0)
       .setDepth(10);
 
-    const panelWidth = 400;
-    const panelHeight = 250;
-    const panelX = width / 2 - panelWidth / 2;
-    const panelY = height / 2 - panelHeight / 2;
+    // --- Premium Panel ---
+    const panelWidth = 500;
+    const panelHeight = 350;
+    const panelX = width / 2;
+    const panelY = height / 2;
+    const cornerRadius = 20;
 
-    const panel = this.add
-      .rectangle(panelX, panelY, panelWidth, panelHeight, 0x1a1a2e, 0.95)
-      .setOrigin(0)
-      .setStrokeStyle(4, 0xd4af37)
-      .setDepth(11);
+    const panel = this.add.graphics({ x: panelX, y: panelY });
+    panel.fillStyle(0x0a0a1a, 0.95); // Dark, sophisticated color
+    panel.lineStyle(4, 0xd4af37, 1); // Gold border
+    panel.fillRoundedRect( -panelWidth / 2, -panelHeight / 2, panelWidth, panelHeight, cornerRadius);
+    panel.strokeRoundedRect( -panelWidth / 2, -panelHeight / 2, panelWidth, panelHeight, cornerRadius);
+    panel.setDepth(11);
 
-    const lockIcon = this.add
-      .text(width / 2, panelY + 50, "🔒", {
-        fontSize: "48px",
+    // --- Content ---
+    const contentY = panelY - panelHeight / 2;
+
+    this.add
+      .text(panelX, contentY + 80, "🔒", {
+        fontSize: "64px",
       })
       .setOrigin(0.5)
       .setDepth(12);
 
-    const titleText = this.add
-      .text(width / 2, panelY + 110, "This villager requires an item", {
-        fontSize: "22px",
+    this.add
+      .text(panelX, contentY + 150, "Item Required", {
+        fontSize: "28px",
         color: "#ffffff",
-        fontFamily: "Arial",
+        fontFamily: "Georgia, serif",
         align: "center",
+        fontStyle: "bold",
+        shadow: { offsetX: 2, offsetY: 2, color: "#000", blur: 4, fill: true },
       })
       .setOrigin(0.5)
       .setDepth(12);
 
     const itemDisplayName = this.villager.requiredItem.replace(/_/g, " ");
-    const itemText = this.add
-      .text(width / 2, panelY + 140, `Required: ${itemDisplayName}`, {
-        fontSize: "20px",
-        color: "#d4af37",
-        fontFamily: "Arial",
+    this.add
+      .text(panelX, contentY + 195, `${itemDisplayName}`, {
+        fontSize: "24px",
+        color: "#ffd700", // Brighter gold
+        fontFamily: "Georgia, serif",
         align: "center",
+        fontStyle: "italic",
       })
       .setOrigin(0.5)
       .setDepth(12);
 
     this.statusText = this.add
-      .text(width / 2, panelY + 170, "Do you want to use this item?", {
-        fontSize: "18px",
+      .text(panelX, contentY + 240, "Do you wish to use this item?", {
+        fontSize: "16px",
         color: "#cccccc",
-        fontFamily: "Arial",
+        fontFamily: "Arial, sans-serif",
         align: "center",
+        wordWrap: { width: panelWidth - 40 },
       })
       .setOrigin(0.5)
       .setDepth(12);
 
-    const buttonWidth = 150;
-    const buttonHeight = 40;
-    const padding = 20;
+    // --- Button Creation ---
+    const buttonY = panelY + panelHeight / 2 - 60;
+    const buttonWidth = 180;
+    const buttonHeight = 50;
+    const buttonSpacing = 30;
 
-    this.tradeButton = this.add
-      .rectangle(
-        width / 2 - buttonWidth - padding / 2,
-        panelY + panelHeight - 50,
-        buttonWidth,
-        buttonHeight,
-        0x4caf50
-      )
-      .setOrigin(0.5)
-      .setDepth(12)
-      .setInteractive({ useHandCursor: true });
+    const createButton = (x, y, text, color, hoverColor) => {
+      const button = this.add.graphics();
+      button.fillStyle(color, 1);
+      button.fillRoundedRect( -buttonWidth / 2, -buttonHeight / 2, buttonWidth, buttonHeight, 15);
 
-    const continueText = this.add
-      .text(this.tradeButton.x, this.tradeButton.y, "Use Item", {
-        fontSize: "16px",
-        color: "#ffffff",
-      })
-      .setOrigin(0.5)
-      .setDepth(13);
+      const buttonText = this.add.text(0, 0, text, {
+          fontSize: "20px",
+          color: "#ffffff",
+          fontFamily: "Georgia, serif",
+        })
+        .setOrigin(0.5);
 
-    this.tradeButton.on("pointerdown", () => {
-      this.tradeInItem();
-    });
+      const container = this.add.container(x, y, [button, buttonText]);
+      container.setSize(buttonWidth, buttonHeight);
+      container.setInteractive({ useHandCursor: true });
+      container.setDepth(12);
 
-    const cancelButton = this.add
-      .rectangle(
-        width / 2 + padding / 2 + buttonWidth / 2,
-        panelY + panelHeight - 50,
-        buttonWidth,
-        buttonHeight,
-        0x555555
-      )
-      .setOrigin(0.5)
-      .setDepth(12)
-      .setInteractive({ useHandCursor: true });
+      container.on("pointerover", () => {
+        button.clear().fillStyle(hoverColor, 1).fillRoundedRect(-buttonWidth / 2, -buttonHeight / 2, buttonWidth, buttonHeight, 15);
+      });
 
-    const cancelText = this.add
-      .text(cancelButton.x, cancelButton.y, "Cancel", {
-        fontSize: "16px",
-        color: "#ffffff",
-      })
-      .setOrigin(0.5)
-      .setDepth(13);
+      container.on("pointerout", () => {
+        button.clear().fillStyle(color, 1).fillRoundedRect(-buttonWidth / 2, -buttonHeight / 2, buttonWidth, buttonHeight, 15);
+      });
 
-    cancelButton.on("pointerdown", () => {
-      this.closeScene();
-    });
+      return container;
+    };
+
+    // Use Item Button
+    this.tradeButton = createButton(
+      panelX - buttonWidth / 2 - buttonSpacing / 2,
+      buttonY,
+      "Trade",
+      0x006400, // Dark Green
+      0x008000 // Brighter Green on hover
+    );
+    this.tradeButton.on("pointerdown", () => this.tradeInItem());
+
+    // Cancel Button
+    const cancelButton = createButton(
+      panelX + buttonWidth / 2 + buttonSpacing / 2,
+      buttonY,
+      "Cancel",
+      0x8B0000, // Dark Red
+      0xB22222 // Brighter Red on hover
+    );
+    cancelButton.on("pointerdown", () => this.closeScene());
 
     console.log("ItemLockScene is active, called from:", this.callingScene);
   }
