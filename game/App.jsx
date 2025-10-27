@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { ethers } from 'ethers';
 import PhaserGame from './components/phaserGame';
 import Hero from './components/landing';
@@ -12,7 +12,7 @@ import UserRegistration from './components/UserRegistration';
 import { UserRegistryService } from './utils/userRegistry';
 import RoomLobby from './components/RoomLobby';
 import { CONTRACT_ADDRESSES, STAKING_MANAGER_ABI } from '../contracts_eth/config';
-import { daService } from './services/daService'; // 1. Import the DA service
+import { daService } from './services/daService';
 
 function App() {
   const [currentView, setCurrentView] = useState('landing');
@@ -262,7 +262,11 @@ function App() {
     setCurrentView('gameMode');
   };
 
-  const handleStartGame = (gameData) => {
+  const handleCloseLobby = useCallback(() => {
+    setShowLobby(false);
+  }, []);
+
+  const handleStartGame = useCallback((gameData) => {
     console.log('Starting multiplayer game with data:', gameData);
     
     setGameConfig({
@@ -270,12 +274,13 @@ function App() {
       isMultiplayer: true,
       roomId: roomId,
       playerId: walletAddress,
-      gameData: gameData
+      gameData: gameData,
+      account: walletAddress
     });
     
     setCurrentView('game');
     setShowLobby(false);
-  };
+  }, [roomId, walletAddress]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -373,7 +378,7 @@ function App() {
             <RoomLobby 
               roomId={roomId} 
               onStart={handleStartGame}
-              onClose={() => setShowLobby(false)}
+              onClose={handleCloseLobby}
               playerId={walletAddress}
             />
           )}

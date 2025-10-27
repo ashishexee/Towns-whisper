@@ -4,6 +4,7 @@ const RoomLobby = ({ roomId, onStart, onClose, playerId }) => {
     const [players, setPlayers] = useState([]);
     const [ws, setWs] = useState(null);
     const [gameStarted, setGameStarted] = useState(false);
+    const [isStarting, setIsStarting] = useState(false);
     const [error, setError] = useState('');
     const wsRef = useRef(null);
     const reconnectAttempts = useRef(0);
@@ -32,6 +33,7 @@ const RoomLobby = ({ roomId, onStart, onClose, playerId }) => {
                     
                     switch (data.type) {
                         case 'room_joined':
+                        case 'update_players': // Handle player list updates
                             setPlayers(data.players || []);
                             break;
                         case 'player_moved':
@@ -44,6 +46,7 @@ const RoomLobby = ({ roomId, onStart, onClose, playerId }) => {
                             break;
                         case 'error':
                             setError(data.message);
+                            setIsStarting(false); // Reset loading state on error
                             break;
                     }
                 };
@@ -88,6 +91,8 @@ const RoomLobby = ({ roomId, onStart, onClose, playerId }) => {
     const startGame = () => {
         if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
             console.log('Sending start_game message');
+            setIsStarting(true);
+            setError('');
             wsRef.current.send(JSON.stringify({ type: 'start_game' }));
         } else {
             setError('Not connected to server');
@@ -145,18 +150,20 @@ const RoomLobby = ({ roomId, onStart, onClose, playerId }) => {
                     >
                         Leave Room
                     </button>
-                    <button
-                        onClick={startGame}
-                        disabled={players.length < 2}
-                        className={`px-4 py-2 text-white rounded transition-colors ${
-                            players.length >= 2 
-                                ? 'bg-green-600 hover:bg-green-700' 
-                                : 'bg-gray-600 cursor-not-allowed'
-                        }`}
-                        title={players.length < 2 ? "Need at least 2 players to start" : "Start the game"}
-                    >
-                        Start Game {players.length < 2 && `(${players.length}/2)`}
-                    </button>
+                    {players.length > 0 && players[0]?.id === playerId && (
+                        <button
+                            onClick={startGame}
+                            disabled={players.length < 2 || isStarting}
+                            className={`px-4 py-2 text-white rounded transition-colors ${
+                                players.length >= 2 && !isStarting
+                                    ? 'bg-green-600 hover:bg-green-700' 
+                                    : 'bg-gray-600 cursor-not-allowed'
+                            }`}
+                            title={players.length < 2 ? "Need at least 2 players to start" : "Start the game"}
+                        >
+                            {isStarting ? 'Loading Game...' : (players.length < 2 ? `Start Game (${players.length}/2)` : 'Start Game')}
+                        </button>
+                    )}
                 </div>
             </div>
         </div>

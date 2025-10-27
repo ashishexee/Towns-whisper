@@ -784,6 +784,12 @@ async def websocket_endpoint(websocket: WebSocket, room_id: str, player_id: str)
             "players": manager.get_room_players(room_id),
             "room": multiplayer_rooms.get(room_id, {})
         }))
+
+        # Notify existing players that a new player has joined
+        await manager.broadcast_to_room({
+            "type": "update_players",
+            "players": manager.get_room_players(room_id)
+        }, room_id, exclude_websocket=websocket)
         
         while True:
             data = await websocket.receive_text()
@@ -849,8 +855,7 @@ async def websocket_endpoint(websocket: WebSocket, room_id: str, player_id: str)
         
         # Notify other players that this player left
         await manager.broadcast_to_room({
-            "type": "player_left",
-            "playerId": player_id,
+            "type": "update_players",
             "players": manager.get_room_players(room_id)
         }, room_id)
 

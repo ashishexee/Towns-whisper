@@ -15,15 +15,19 @@ export class UIScene extends Phaser.Scene {
     this.resetHintText = null;
     this.inventoryButton = null;
     this.homeScene = null;
+    this.gameScene = null;
   }
 
   init(data) {
-    if (data && data.inaccessibleLocations) {
-      this.inaccessibleLocations = data.inaccessibleLocations;
+    if (data) {
+      this.inaccessibleLocations = data.inaccessibleLocations || [];
       this.account = data.account;
       this.difficulty = data.difficulty || "Easy";
+      this.callingScene = data.callingScene || "HomeScene";
+    } else {
+      this.inaccessibleLocations = [];
+      this.callingScene = "HomeScene";
     }
-    this.homeScene = this.scene.get("HomeScene");
   }
 
   create() {
@@ -46,9 +50,15 @@ export class UIScene extends Phaser.Scene {
       .setScrollFactor(0)
       .setDepth(0);
 
-    this.createLocationButton();
     this.createInventoryButton();
-    this.createGiveUpButton();
+    this.createLocationButton();
+
+    if (this.callingScene === "HomeScene") {
+      this.homeScene = this.scene.get("HomeScene");
+      this.createGiveUpButton();
+    }
+
+    this.updateLocationButtonState();
 
     this.time.addEvent({
       delay: 1000,
@@ -56,8 +66,6 @@ export class UIScene extends Phaser.Scene {
       callbackScope: this,
       loop: true,
     });
-
-    this.updateLocationButtonState();
   }
 
   createLocationButton() {
@@ -80,18 +88,22 @@ export class UIScene extends Phaser.Scene {
         return;
       }
 
-      if (this.homeScene.isStaking && this.homeScene.guessMade) {
-        const success = await this.homeScene.payGuessPenalty();
-        if (success) {
-          this.homeScene.guessMade = false;
-          this.updateLocationButtonState();
-          this.showLocationChoices();
-        }
-      } else if (this.homeScene.wrongLocationChosen) {
-        const success = await this.homeScene.payGuessPenalty(); // Assuming the same penalty logic
-        if (success) {
-          this.homeScene.wrongLocationChosen = false;
-          this.updateLocationButtonState();
+      if (this.callingScene === "HomeScene") {
+        if (this.homeScene.isStaking && this.homeScene.guessMade) {
+          const success = await this.homeScene.payGuessPenalty();
+          if (success) {
+            this.homeScene.guessMade = false;
+            this.updateLocationButtonState();
+            this.showLocationChoices();
+          }
+        } else if (this.homeScene.wrongLocationChosen) {
+          const success = await this.homeScene.payGuessPenalty(); // Assuming the same penalty logic
+          if (success) {
+            this.homeScene.wrongLocationChosen = false;
+            this.updateLocationButtonState();
+            this.showLocationChoices();
+          }
+        } else {
           this.showLocationChoices();
         }
       } else {
@@ -100,12 +112,16 @@ export class UIScene extends Phaser.Scene {
     });
 
     button.on("pointerover", () => {
-      if (this.locationButtonEnabled && !this.homeScene.wrongLocationChosen) {
+      const isWrongChoice =
+        this.callingScene === "HomeScene" && this.homeScene.wrongLocationChosen;
+      if (this.locationButtonEnabled && !isWrongChoice) {
         button.setBackgroundColor("#f5d56b");
       }
     });
     button.on("pointerout", () => {
-      if (this.locationButtonEnabled && !this.homeScene.wrongLocationChosen) {
+      const isWrongChoice =
+        this.callingScene === "HomeScene" && this.homeScene.wrongLocationChosen;
+      if (this.locationButtonEnabled && !isWrongChoice) {
         button.setBackgroundColor("#d4af37");
       }
     });
@@ -132,12 +148,49 @@ export class UIScene extends Phaser.Scene {
       .setDepth(300);
 
     button.on("pointerdown", () => {
-      const homeScene = this.scene.get("HomeScene");
-      if (homeScene && homeScene.scene.isActive()) {
-        homeScene.scene.pause();
-        this.scene.launch("InventoryScene", {
-          inventory: Array.from(homeScene.playerInventory),
-        });
+      console.log("[UIScene] Inventory button clicked.");
+      console.log(`[UIScene] Calling scene: ${this.callingScene}`);
+
+      const sourceScene = this.scene.get(this.callingScene);
+      if (sourceScene) {
+        console.log(`[UIScene] Found source scene: ${this.callingScene}`);
+        if (sourceScene.playerInventory) {
+          console.log(
+            "[UIScene] Player inventory found:",
+            sourceScene.playerInventory
+          );
+
+          let pausedByInventory = false;
+          if (
+            this.scene.isActive(this.callingScene) &&
+            !sourceScene.sys.isPaused()
+          ) {
+            console.log(
+              `[UIScene] Pausing active scene: ${this.callingScene}`
+            );
+            this.scene.pause(this.callingScene);
+            pausedByInventory = true;
+          } else {
+            console.log(
+              `[UIScene] Scene ${this.callingScene} is not active or already paused, not pausing.`
+            );
+          }
+
+          this.scene.launch("InventoryScene", {
+            inventory: sourceScene.playerInventory,
+            callingScene: this.callingScene,
+            account: this.account,
+            pausedByInventory: pausedByInventory,
+          });
+        } else {
+          console.error(
+            `[UIScene] Player inventory not found in scene: ${this.callingScene}`
+          );
+        }
+      } else {
+        console.error(
+          `[UIScene] Could not find source scene: ${this.callingScene}`
+        );
       }
     });
 
@@ -228,7 +281,11 @@ export class UIScene extends Phaser.Scene {
   showLocationChoices() {
     if (this._locationOverlay) return;
 
-    if (this.homeScene.isStaking && this.homeScene.guessMade) {
+    if (
+      this.callingScene === "HomeScene" &&
+      this.homeScene.isStaking &&
+      this.homeScene.guessMade
+    ) {
       return;
     }
 
@@ -345,72 +402,78 @@ export class UIScene extends Phaser.Scene {
       .setDepth(2501)
       .setScrollFactor(0);
 
-    const result = await chooseLocation(location);
-    if (!result) {
-      feedbackText.setText("Error: Game session not found.");
-      this.time.delayedCall(2000, () => {
-        this.scene.stop("HomeScene");
-        this.scene.start("MenuScene");
-      });
-      return;
-    }
-
-    if (result.is_correct) {
-      feedbackText.setText(`Investigation successful!`);
-
-      this.time.delayedCall(1500, async () => {
-        const homeScene = this.scene.get("HomeScene");
-
-        let baseScore = 0;
-
-        const difficultyMultipliers = {
-          "Very Easy": 0.5,
-          Easy: 1,
-          Medium: 1.5,
-          Hard: 2,
-        };
-        const difficultyMultiplier = difficultyMultipliers[this.difficulty] || 1;
-        const timeBonus = Math.max(0, 600 - this.elapsedSeconds) * 10 * difficultyMultiplier;
-        const guessPenalty = homeScene.guessCount * 500 * difficultyMultiplier;
-        const nftBonus = homeScene.nftCount * 2000 * difficultyMultiplier;
-        const finalScore = baseScore + timeBonus - guessPenalty + nftBonus;
-
-        this.scene.stop("HomeScene");
-        this.scene.stop("UIScene");
-        this.scene.start("EndScene", {
-          score: Math.round(finalScore),
-          time: this.formatTime(this.elapsedSeconds),
-          guesses: homeScene.guessCount,
-          nfts: homeScene.nftCount,
-          account: this.account,
-          story: result.story,
-          isCorrect: true,
-          isStaking: homeScene.isStaking,
-          elapsedTime: this.elapsedSeconds,
-          timeLimit: homeScene.timeLimit,
-        });
-      });
+    if (this.callingScene === "MultiplayerScene") {
+      const multiplayerScene = this.scene.get("MultiplayerScene");
+      multiplayerScene.handleGuess(location);
+      feedbackText.destroy();
     } else {
-      feedbackText.setText(`Nothing found at ${location}. Try again.`);
-      this.homeScene.guessCount++;
-      if (this.homeScene.isStaking) {
-        this.homeScene.guessMade = true;
-      } else {
-        // Lock location button and change text for non-staking wrong guess
-        this.homeScene.wrongLocationChosen = true;
+      const result = await chooseLocation(location);
+      if (!result) {
+        feedbackText.setText("Error: Game session not found.");
+        this.time.delayedCall(2000, () => {
+          this.scene.stop("HomeScene");
+          this.scene.start("MenuScene");
+        });
+        return;
       }
-      this.updateLocationButtonState();
-      this.time.delayedCall(2000, () => {
-        feedbackText.destroy();
-      });
+
+      if (result.is_correct) {
+        feedbackText.setText(`Investigation successful!`);
+
+        this.time.delayedCall(1500, async () => {
+          const homeScene = this.scene.get("HomeScene");
+
+          let baseScore = 0;
+
+          const difficultyMultipliers = {
+            "Very Easy": 0.5,
+            Easy: 1,
+            Medium: 1.5,
+            Hard: 2,
+          };
+          const difficultyMultiplier =
+            difficultyMultipliers[this.difficulty] || 1;
+          const timeBonus =
+            Math.max(0, 600 - this.elapsedSeconds) * 10 * difficultyMultiplier;
+          const guessPenalty =
+            homeScene.guessCount * 500 * difficultyMultiplier;
+          const nftBonus = homeScene.nftCount * 2000 * difficultyMultiplier;
+          const finalScore = baseScore + timeBonus - guessPenalty + nftBonus;
+
+          this.scene.stop("HomeScene");
+          this.scene.stop("UIScene");
+          this.scene.start("EndScene", {
+            score: Math.round(finalScore),
+            time: this.formatTime(this.elapsedSeconds),
+            guesses: homeScene.guessCount,
+            nfts: homeScene.nftCount,
+            account: this.account,
+            story: result.story,
+            isCorrect: true,
+            isStaking: homeScene.isStaking,
+            elapsedTime: this.elapsedSeconds,
+            timeLimit: homeScene.timeLimit,
+          });
+        });
+      } else {
+        feedbackText.setText(`Nothing found at ${location}. Try again.`);
+        this.homeScene.guessCount++;
+        if (this.homeScene.isStaking) {
+          this.homeScene.guessMade = true;
+        } else {
+          this.homeScene.wrongLocationChosen = true;
+        }
+        this.updateLocationButtonState();
+        this.time.delayedCall(2000, () => {
+          feedbackText.destroy();
+        });
+      }
     }
   }
 
   update() {
     if (this.elapsedSeconds >= 5 && !this.locationButtonEnabled) {
       this.locationButtonEnabled = true;
-      this.locationButton.setBackgroundColor("#d4af37");
-      this.locationButton.setColor("#000000");
       this.updateLocationButtonState();
     }
   }
@@ -432,16 +495,28 @@ export class UIScene extends Phaser.Scene {
   updateLocationButtonState() {
     if (!this.locationButton) return;
 
-    if (this.homeScene.isStaking && this.homeScene.guessMade) {
-      this.locationButton.setText("Pay 0.01 0G to Guess Again");
-      this.locationButton.setBackgroundColor("#992222");
-      this.locationButton.setColor("#ffffff");
-    } else if (this.homeScene.wrongLocationChosen) {
-      this.locationButton.setText("Deposit 0.01 G");
-      this.locationButton.setBackgroundColor("#992222"); // Red color for penalty
-      this.locationButton.setColor("#ffffff");
-      this.locationButtonEnabled = true; // Keep button interactive for deposit
+    if (this.callingScene === "HomeScene") {
+      if (this.homeScene.isStaking && this.homeScene.guessMade) {
+        this.locationButton.setText("Pay 0.01 0G to Guess Again");
+        this.locationButton.setBackgroundColor("#992222");
+        this.locationButton.setColor("#ffffff");
+      } else if (this.homeScene.wrongLocationChosen) {
+        this.locationButton.setText("Deposit 0.01 G");
+        this.locationButton.setBackgroundColor("#992222"); // Red color for penalty
+        this.locationButton.setColor("#ffffff");
+        this.locationButtonEnabled = true; // Keep button interactive for deposit
+      } else {
+        this.locationButton.setText("Choose Location");
+        if (this.locationButtonEnabled) {
+          this.locationButton.setBackgroundColor("#d4af37");
+          this.locationButton.setColor("#000000");
+        } else {
+          this.locationButton.setBackgroundColor("#555555");
+          this.locationButton.setColor("#A9A9A9");
+        }
+      }
     } else {
+      // Default state for multiplayer
       this.locationButton.setText("Choose Location");
       if (this.locationButtonEnabled) {
         this.locationButton.setBackgroundColor("#d4af37");
