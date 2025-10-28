@@ -88,22 +88,13 @@ export class UIScene extends Phaser.Scene {
         return;
       }
 
-      if (this.callingScene === "HomeScene") {
-        if (this.homeScene.isStaking && this.homeScene.guessMade) {
-          const success = await this.homeScene.payGuessPenalty();
-          if (success) {
-            this.homeScene.guessMade = false;
-            this.updateLocationButtonState();
-            this.showLocationChoices();
-          }
-        } else if (this.homeScene.wrongLocationChosen) {
-          const success = await this.homeScene.payGuessPenalty(); // Assuming the same penalty logic
-          if (success) {
-            this.homeScene.wrongLocationChosen = false;
-            this.updateLocationButtonState();
-            this.showLocationChoices();
-          }
-        } else {
+      const gameScene = this.scene.get(this.callingScene);
+
+      if (gameScene && gameScene.wrongLocationChosen) {
+        const success = await gameScene.payGuessPenalty();
+        if (success) {
+          gameScene.wrongLocationChosen = false;
+          this.updateLocationButtonState();
           this.showLocationChoices();
         }
       } else {
@@ -112,15 +103,15 @@ export class UIScene extends Phaser.Scene {
     });
 
     button.on("pointerover", () => {
-      const isWrongChoice =
-        this.callingScene === "HomeScene" && this.homeScene.wrongLocationChosen;
+      const gameScene = this.scene.get(this.callingScene);
+      const isWrongChoice = gameScene && gameScene.wrongLocationChosen;
       if (this.locationButtonEnabled && !isWrongChoice) {
         button.setBackgroundColor("#f5d56b");
       }
     });
     button.on("pointerout", () => {
-      const isWrongChoice =
-        this.callingScene === "HomeScene" && this.homeScene.wrongLocationChosen;
+      const gameScene = this.scene.get(this.callingScene);
+      const isWrongChoice = gameScene && gameScene.wrongLocationChosen;
       if (this.locationButtonEnabled && !isWrongChoice) {
         button.setBackgroundColor("#d4af37");
       }
@@ -495,28 +486,14 @@ export class UIScene extends Phaser.Scene {
   updateLocationButtonState() {
     if (!this.locationButton) return;
 
-    if (this.callingScene === "HomeScene") {
-      if (this.homeScene.isStaking && this.homeScene.guessMade) {
-        this.locationButton.setText("Pay 0.01 0G to Guess Again");
-        this.locationButton.setBackgroundColor("#992222");
-        this.locationButton.setColor("#ffffff");
-      } else if (this.homeScene.wrongLocationChosen) {
-        this.locationButton.setText("Deposit 0.01 G");
-        this.locationButton.setBackgroundColor("#992222"); // Red color for penalty
-        this.locationButton.setColor("#ffffff");
-        this.locationButtonEnabled = true; // Keep button interactive for deposit
-      } else {
-        this.locationButton.setText("Choose Location");
-        if (this.locationButtonEnabled) {
-          this.locationButton.setBackgroundColor("#d4af37");
-          this.locationButton.setColor("#000000");
-        } else {
-          this.locationButton.setBackgroundColor("#555555");
-          this.locationButton.setColor("#A9A9A9");
-        }
-      }
+    const gameScene = this.scene.get(this.callingScene);
+
+    if (gameScene && gameScene.wrongLocationChosen) {
+      this.locationButton.setText("Deposit 0.01 G");
+      this.locationButton.setBackgroundColor("#992222");
+      this.locationButton.setColor("#ffffff");
+      this.locationButtonEnabled = true;
     } else {
-      // Default state for multiplayer
       this.locationButton.setText("Choose Location");
       if (this.locationButtonEnabled) {
         this.locationButton.setBackgroundColor("#d4af37");

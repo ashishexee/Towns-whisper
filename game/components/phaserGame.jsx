@@ -8,7 +8,7 @@ import { ItemLockScene } from '../scenes/ItemlockScene';
 import { MultiplayerScene } from '../scenes/MultiplayerScene';
 import { UIScene } from '../scenes/UIScene';
 import { InventoryScene } from '../scenes/InventoryScene';
-import {EndScene} from '../scenes/EndScene'
+import {EndScene} from '../scenes/EndScene';
  
 const PhaserGame = ({ gameConfig }) => {
   const gameRef = useRef(null);

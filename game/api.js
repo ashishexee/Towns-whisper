@@ -132,13 +132,6 @@ async function chooseLocation(location, playerId = null) {
 
     const data = await response.json();
     
-    // --- NEW: Call the end game endpoint after a guess is made ---
-    // This ensures the dialogue history is saved regardless of win or lose.
-    if (currentGameId && data.is_correct) {
-      await endGame(playerId);
-    }
-    // --- END NEW CODE ---
-
     return data;
 
   } catch (error) {
@@ -147,41 +140,6 @@ async function chooseLocation(location, playerId = null) {
   }
 }
 
-/**
- * Notifies the backend that the game session has ended to save dialogue history.
- * @param {string | null} playerId The ID of the player ending the session.
- * @returns {Promise<void>}
- */
-async function endGame(playerId = null) {
-  if (!currentGameId) {
-    console.error("Cannot end game: no active game ID.");
-    return;
-  }
-
-  try {
-    const response = await fetch(`${API_BASE_URL}/game/end`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        game_id: currentGameId,
-        // Use 'single_player' as a fallback if no player ID is provided
-        player_id: playerId || 'single_player',
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const result = await response.json();
-    console.log('Game end acknowledged by server:', result.message);
-
-  } catch (error) {
-    console.error("Error ending game:", error);
-  }
-}
 
 /**
  * Sets the current game ID.
@@ -206,6 +164,5 @@ export {
   startNewGame, 
   getConversation, 
   chooseLocation, 
-  pingServer,
-  endGame // --- NEW EXPORT ---
+  pingServer
 };

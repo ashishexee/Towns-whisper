@@ -3,6 +3,7 @@ import { getConversation, chooseLocation, setCurrentGameId } from "../api.js";
 import {
   GAME_ITEMS_ABI,
   CONTRACT_ADDRESSES,
+  STAKING_MANAGER_ABI,
 } from "../../contracts_eth/config.js";
 import { ethers } from "ethers";
 export class MultiplayerScene extends Phaser.Scene {
@@ -25,6 +26,7 @@ export class MultiplayerScene extends Phaser.Scene {
     this.account = null;
     this.mintKey = null;
     this.playerLight = null;
+    this.wrongLocationChosen = false;
   }
 
   async updateInventory() {
@@ -903,43 +905,104 @@ export class MultiplayerScene extends Phaser.Scene {
 
     try {
       const result = await chooseLocation(location, this.playerId);
+      const uiScene = this.scene.get("UIScene");
+
       if (result && result.is_correct) {
-        this.gameWon = true;
-
-        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-          this.ws.send(
-            JSON.stringify({
-              type: "game_won",
-              location: location,
-              is_true_ending: result.is_true_ending,
-            })
-          );
+        console.log("Correct guess! Waiting for server to end the game.");
+      } else if (result && result.requires_deposit) {
+        this.wrongLocationChosen = true;
+        this.showErrorMessage(result.message);
+        if (uiScene) {
+          uiScene.updateLocationButtonState();
         }
-
-        this.winnerText
-          .setText(`🎉 YOU WON! 🎉\n${result.message}`)
-          .setVisible(true);
+      } else {
+        this.showErrorMessage(result.message || "Incorrect guess.");
       }
     } catch (error) {
       console.error("Error making guess:", error);
+      this.showErrorMessage("An error occurred while making a guess.");
     }
   }
 
   handleGameEnd(winnerId, winnerName) {
     this.gameWon = true;
+    this.input.keyboard.enabled = false;
+
+    // Create a semi-transparent background
+    const rect = this.add.rectangle(
+      this.cameras.main.centerX,
+      this.cameras.main.centerY,
+      500,
+      200,
+      0x000000,
+      0.8
+    );
+    rect.setOrigin(0.5).setScrollFactor(0).setDepth(99);
+    rect.setStrokeStyle(2, 0xffd700);
+
+    let titleText, messageText;
 
     if (winnerId === this.playerId) {
-      this.winnerText
-        .setText(`🎉 YOU WON! 🎉\nCongratulations!`)
-        .setVisible(true);
+      titleText = this.add.text(
+        this.cameras.main.centerX,
+        this.cameras.main.centerY - 40,
+        "🎉 Congratulations! 🎉",
+        {
+          fontSize: "32px",
+          color: "#FFD700",
+          fontStyle: "bold",
+          align: "center",
+        }
+      ).setOrigin(0.5).setScrollFactor(0).setDepth(100);
+
+      messageText = this.add.text(
+        this.cameras.main.centerX,
+        this.cameras.main.centerY + 20,
+        "You have won the game!",
+        {
+          fontSize: "24px",
+          color: "#FFFFFF",
+          align: "center",
+        }
+      ).setOrigin(0.5).setScrollFactor(0).setDepth(100);
+
     } else {
-      this.winnerText
-        .setText(`🏆 ${winnerName} Won! 🏆\nBetter luck next time!`)
-        .setVisible(true);
+      titleText = this.add.text(
+        this.cameras.main.centerX,
+        this.cameras.main.centerY - 40,
+        "🏆 Game Over 🏆",
+        {
+          fontSize: "32px",
+          color: "#FFD700",
+          fontStyle: "bold",
+          align: "center",
+        }
+      ).setOrigin(0.5).setScrollFactor(0).setDepth(100);
+
+      messageText = this.add.text(
+        this.cameras.main.centerX,
+        this.cameras.main.centerY + 20,
+        `${winnerName} has won the game.\nBetter luck next time!`,
+        {
+          fontSize: "20px",
+          color: "#FFFFFF",
+          align: "center",
+        }
+      ).setOrigin(0.5).setScrollFactor(0).setDepth(100);
+    }
+
+    // Hide the old winnerText if it exists
+    if (this.winnerText) {
+      this.winnerText.setVisible(false);
     }
 
     this.time.delayedCall(5000, () => {
-      this.scene.start("HomeScene");
+      if (this.ws) {
+        this.ws.onclose = null; 
+        this.ws.close();
+      }
+      // Reload the entire application to go back to the landing page
+      window.location.reload();
     });
   }
 
@@ -1368,6 +1431,57 @@ export class MultiplayerScene extends Phaser.Scene {
     if (this.connectionTimeout) {
       clearTimeout(this.connectionTimeout);
       this.connectionTimeout = null;
+    }
+  }
+
+  async payGuessPenalty() {
+    if (!this.wrongLocationChosen) {
+      console.log("No penalty required.");
+      return true;
+    }
+    if (!this.account) {
+      this.showErrorMessage("Wallet not connected.");
+      return false;
+    }
+
+    this.input.keyboard.enabled = false;
+    const statusText = this.add.text(
+      this.cameras.main.centerX, this.cameras.main.centerY,
+      "Submitting 0.01 0G penalty...",
+      { fontSize: "24px", color: "#d4af37", backgroundColor: "rgba(0,0,0,0.8)", padding: { x: 20, y: 10 } }
+    ).setOrigin(0.5).setDepth(101).setScrollFactor(0);
+
+    try {
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const signer = await provider.getSigner();
+      const stakingContract = new ethers.Contract(CONTRACT_ADDRESSES.stakingManager, STAKING_MANAGER_ABI, signer);
+
+      statusText.setText("Please confirm in wallet...");
+      const penaltyAmount = ethers.parseEther("0.01");
+      
+      const tx = await stakingContract.depositFundsForHint({ value: penaltyAmount });
+
+      statusText.setText("Transaction sent. Waiting for confirmation...");
+      await tx.wait();
+
+      statusText.setText("Penalty paid successfully!");
+      this.time.delayedCall(2000, () => {
+        statusText.destroy();
+        this.input.keyboard.enabled = true;
+      });
+      return true;
+    } catch (error) {
+      console.error("Penalty payment failed:", error);
+      let errorMessage = "Penalty payment failed.";
+      if (error.code === 'ACTION_REJECTED') {
+        errorMessage = "Transaction rejected.";
+      }
+      statusText.setText(errorMessage);
+      this.time.delayedCall(3000, () => {
+        statusText.destroy();
+        this.input.keyboard.enabled = true;
+      });
+      return false;
     }
   }
 }
