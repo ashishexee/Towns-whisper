@@ -38,6 +38,8 @@ export class HomeScene extends Phaser.Scene {
     this.timeLimit = null;
     this.movingVillagers = null;
     this.movingVillagerPaths = []; 
+    this.inftTokenId = null;
+    this.inftManager = null;
   }
 
   init(data) {
@@ -1707,4 +1709,118 @@ export class HomeScene extends Phaser.Scene {
     }
   }
 
+  async initializeGameINFT() {
+    try {
+        console.log('🎮 Initializing Game INFT...');
+        console.log('🔑 Account:', this.account);
+        console.log('🎯 Difficulty:', this.difficulty);
+
+        if (!this.account) {
+            console.error('❌ No account available for INFT creation');
+            return;
+        }
+
+        // Get player's keypair (in production, derive from wallet)
+        console.log('🔐 Generating player keypair...');
+        const playerKeypair = await this.generatePlayerKeypair();
+        console.log('✅ Keypair generated:', {
+            publicKey: playerKeypair.publicKey.substring(0, 20) + '...',
+            hasSecretKey: !!playerKeypair.secretKey
+        });
+
+        console.log('📡 Making INFT creation request...');
+        const response = await fetch('http://localhost:3002/inft/create', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                playerAddress: this.account,
+                gameMode: 'single_player',
+                difficulty: this.difficulty,
+                ownerPublicKey: playerKeypair.publicKey // Send public key
+            })
+        });
+
+        console.log('📡 Response status:', response.status);
+        
+        if (response.ok) {
+            const result = await response.json();
+            console.log('🎉 INFT creation response:', result);
+            
+            this.inftTokenId = result.tokenId;
+            this.playerPublicKey = playerKeypair.publicKey;
+            this.playerSecretKey = playerKeypair.secretKey; // Store locally (in-memory only)
+            
+            console.log(`✅ Game INFT #${this.inftTokenId} created`);
+            this.showINFTNotification('Your Narrative INFT has been born! It will evolve as you play.');
+        } else {
+            const errorText = await response.text();
+            console.error('❌ INFT creation failed:', response.status, errorText);
+        }
+    } catch (error) {
+        console.error('❌ Failed to initialize Game INFT:', error);
+    }
 }
+
+async generatePlayerKeypair() {
+    // In production, derive from wallet's signature or use a secure enclave
+    // For now, generate and store locally
+    if (this.playerKeypair) return this.playerKeypair;
+
+    const response = await fetch('http://localhost:3002/crypto/generate-keypair', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            playerAddress: this.account
+        })
+    });
+
+    if (response.ok) {
+        const keypair = await response.json();
+        this.playerKeypair = keypair;
+        return keypair;
+    }
+
+    throw new Error('Failed to generate keypair');
+}
+
+async updateINFTProgress() {
+    if (!this.inftTokenId || !this.account || !this.playerPublicKey) return;
+
+    try {
+        const gameProgressData = {
+            tokenId: this.inftTokenId,
+            playerAddress: this.account,
+            villagerInteractions: this.getVillagerInteractionCount(),
+            itemsCollected: this.playerInventory.size,
+            collectedItemNames: Array.from(this.playerInventory.keys()),
+            penaltiesPaid: this.calculatePenaltiesPaid(),
+            currentScore: this.calculateCurrentScore(),
+            progressPercentage: this.calculateGameProgress(),
+            version: this.gameProgressVersion || 1,
+            playDurationSeconds: Math.floor((Date.now() - this.gameStartTime) / 1000)
+        };
+
+        const response = await fetch('http://localhost:3002/inft/evolve', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                tokenId: this.inftTokenId,
+                gameProgressData,
+                ownerPublicKey: this.playerPublicKey // Send public key for re-encryption
+            })
+        });
+
+        if (response.ok) {
+            const result = await response.json();
+            console.log(`🌱 INFT evolved to stage: ${result.newStage}`);
+
+            if (result.newStage !== 'newborn') {
+                this.showINFTNotification(`Your Guide has evolved to ${result.newStage}!`);
+            }
+
+            this.gameProgressVersion = (this.gameProgressVersion || 1) + 1;
+        }
+    } catch (error) {
+        console.error('❌ Failed to update INFT progress:', error);
+    }
+}}

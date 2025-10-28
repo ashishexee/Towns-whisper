@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import { StorageManager } from "./storageManager.js";
+import { INFTManager } from './INFTManager.js';
 
 const app = express();
 app.use(cors());
@@ -8,6 +9,7 @@ app.use(express.json());
 const port = 3002;
 
 const storageManager = new StorageManager();
+const inftManager = new INFTManager();
 
 app.get("/", (req, res) => {
   res.send("0G Storage Service is running!");
@@ -129,6 +131,156 @@ app.get("/nft/:itemName", async (req, res) => {
     console.error(`Error getting NFT metadata: ${error.message}`);
     res.status(500).json({ message: "Failed to retrieve NFT metadata." });
   }
+});
+
+// Create new Game INFT
+app.post('/inft/create', async (req, res) => {
+    try {
+        const { playerAddress, gameMode, difficulty, ownerPublicKey } = req.body;
+
+        if (!ownerPublicKey) {
+            return res.status(400).json({
+                success: false,
+                error: 'ownerPublicKey is required for encryption'
+            });
+        }
+
+        const result = await inftManager.createGameINFT(
+            playerAddress,
+            gameMode,
+            difficulty,
+            ownerPublicKey
+        );
+
+        res.json({
+            success: true,
+            tokenId: result.tokenId,
+            ipfsHash: result.ipfsHash,
+            metadataHash: result.metadataHash,
+            metadata: result.metadata
+        });
+    } catch (error) {
+        console.error('INFT creation failed:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Evolve existing INFT
+app.post('/inft/evolve', async (req, res) => {
+    try {
+        const { tokenId, gameProgressData, ownerPublicKey, oracleProof } = req.body;
+
+        if (!ownerPublicKey) {
+            return res.status(400).json({
+                success: false,
+                error: 'ownerPublicKey is required'
+            });
+        }
+
+        const result = await inftManager.evolveINFT(
+            tokenId,
+            gameProgressData,
+            ownerPublicKey,
+            oracleProof
+        );
+
+        res.json({
+            success: true,
+            newStage: result.newStage,
+            ipfsHash: result.newIpfsHash,
+            metadataHash: result.newMetadataHash
+        });
+    } catch (error) {
+        console.error('INFT evolution failed:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Initiate secure transfer
+app.post('/inft/initiate-transfer', async (req, res) => {
+    try {
+        const { tokenId, currentOwner, newOwner, transferProof } = req.body;
+
+        const result = await inftManager.initiateSecureTransfer(
+            tokenId,
+            currentOwner,
+            newOwner,
+            transferProof
+        );
+
+        res.json({
+            success: true,
+            ...result
+        });
+    } catch (error) {
+        console.error('INFT transfer initiation failed:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Complete secure transfer
+app.post('/inft/complete-transfer', async (req, res) => {
+    try {
+        const { tokenId, newOwner, newOwnerPublicKey, newSealedKey } = req.body;
+
+        if (!newOwnerPublicKey) {
+            return res.status(400).json({
+                success: false,
+                error: 'newOwnerPublicKey is required'
+            });
+        }
+
+        const result = await inftManager.completeSecureTransfer(
+            tokenId,
+            newOwner,
+            newOwnerPublicKey,
+            newSealedKey
+        );
+
+        res.json({
+            success: true,
+            ...result
+        });
+    } catch (error) {
+        console.error('INFT transfer completion failed:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Get INFT details
+app.get('/inft/:tokenId', async (req, res) => {
+    try {
+        const { tokenId } = req.params;
+
+        const metadata = await inftManager.inftContract.getCurrentMetadata(tokenId);
+        const history = await inftManager.inftContract.getMetadataHistory(tokenId);
+
+        res.json({
+            success: true,
+            metadata,
+            history
+        });
+    } catch (error) {
+        console.error('Failed to fetch INFT details:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Get player's INFTs
+app.get('/inft/player/:address', async (req, res) => {
+    try {
+        const { address } = req.params;
+
+        const inftTokens = await inftManager.inftContract.getPlayerINFTs(address);
+
+        res.json({
+            success: true,
+            infts: inftTokens
+        });
+    } catch (error) {
+        console.error('Failed to fetch player INFTs:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
 });
 
 app.listen(port, () => {
