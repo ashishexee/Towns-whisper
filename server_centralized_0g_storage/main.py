@@ -863,6 +863,7 @@ async def get_room(room_id: str):
         "winner": room.get("winner")
     }
 
+
 @app.websocket("/ws/{room_id}/{player_id}")
 async def websocket_endpoint(websocket: WebSocket, room_id: str, player_id: str):
     player_name = f"Player_{player_id[:8]}"
@@ -877,10 +878,19 @@ async def websocket_endpoint(websocket: WebSocket, room_id: str, player_id: str)
         room["players"].append({"id": player_id, "name": player_name})
     
     try:
-        # Send initial room state
+        # 1. Get the latest list of players
+        current_players = manager.get_room_players(room_id)
+
+        # 2. Notify all OTHER players that a new player has joined
+        await manager.broadcast_to_room({
+            "type": "player_joined",
+            "players": current_players
+        }, room_id, exclude_websocket=websocket)
+
+        # 3. Send the full room state to the NEWLY connected player
         await websocket.send_text(json.dumps({
             "type": "room_joined",
-            "players": manager.get_room_players(room_id),
+            "players": current_players,
             "room": multiplayer_rooms.get(room_id, {})
         }))
         

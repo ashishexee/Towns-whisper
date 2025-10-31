@@ -33,6 +33,7 @@ const RoomLobby = ({ roomId, onStart, onClose, playerId }) => {
                     
                     switch (data.type) {
                         case 'room_joined':
+                        case 'player_joined':
                         case 'update_players': // Handle player list updates
                             setPlayers(data.players || []);
                             break;
