@@ -256,8 +256,11 @@ export class HomeScene extends Phaser.Scene {
 
     console.log("diffulty - ", this.difficulty);
 
+    statusText.setText("Fetching dialogue history from 0G Storage...");
+
     const { game_id, inaccessible_locations, villagers } = await startNewGame(
-      this.difficulty
+      this.difficulty,
+      this.account
     );
 
     progressTimer.destroy();
@@ -982,7 +985,8 @@ export class HomeScene extends Phaser.Scene {
     }
   }
 
-  async initiateConversation(villager) {
+  // Track dialogues when interacting with villagers
+async initiateConversation(villager) {
     this.input.keyboard.enabled = false;
     this.player.setVelocity(0, 0);
 
@@ -990,7 +994,9 @@ export class HomeScene extends Phaser.Scene {
     this.sound.play("villager_accept", { volume: 6 });
     console.log(villager.name);
 
-    const conversationData = await getConversation(villager.name, "Hello");
+    const playerMessage = "Hello";
+
+    const conversationData = await getConversation(villager.name, playerMessage, this.account);
 
     this.input.keyboard.enabled = true;
     this.interactionText.setText("Press ENTER to talk");
@@ -1001,13 +1007,35 @@ export class HomeScene extends Phaser.Scene {
         conversationData: conversationData,
         newGameData: this.gameData,
         villagerSpriteKey: villager.texture.key,
+        playerId: this.account,
       });
+
+      // Store dialogue in history
+      const dialogueScene = this.scene.get("DialogueScene");
+      if (dialogueScene && dialogueScene.displayDialogue) {
+        dialogueScene.displayDialogue(
+          villager.name,
+          conversationData.npc_dialogue,
+          playerMessage
+        );
+      }
     } else {
       console.error(
         "Could not fetch conversation for villager:",
         villager.name
       );
     }
+  }
+
+  // Pass dialogue history when game ends
+  handleGameEnd(winnerId) {
+    const dialogueScene = this.scene.get("DialogueScene");
+    const dialogueHistory = dialogueScene ? dialogueScene.getDialogueHistory() : [];
+    
+    this.scene.start("EndScene", {
+      dialogueHistory: dialogueHistory,
+      // ... other data ...
+    });
   }
 
   createMovingVillagers() {
@@ -1352,7 +1380,7 @@ export class HomeScene extends Phaser.Scene {
     this.input.keyboard.enabled = false;
     this.player.setVelocity(0, 0);
     
-    getConversation(this.nearbyVillager.name, "I'd like to talk.")
+    getConversation(this.nearbyVillager.name, "I'd like to talk.", this.account)
       .then(conversationData => {
         console.log("Conversation data received:", conversationData);
         
@@ -1360,7 +1388,8 @@ export class HomeScene extends Phaser.Scene {
           this.scene.launch("DialogueScene", {
             conversationData: conversationData,
             villagerSpriteKey: this.nearbyVillager.texture.key,
-            newGameData: this.gameData
+            newGameData: this.gameData,
+            playerId: this.account
           });
           this.scene.pause();
         } else {
@@ -1823,4 +1852,5 @@ async updateINFTProgress() {
     } catch (error) {
         console.error('❌ Failed to update INFT progress:', error);
     }
-}}
+}
+}

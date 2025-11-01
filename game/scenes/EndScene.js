@@ -1,5 +1,6 @@
 import Phaser from "phaser";
 import { ethers } from "ethers";
+import { endGame } from "../api.js";
 import {
   STAKING_MANAGER_ABI,
   CONTRACT_ADDRESSES,
@@ -186,6 +187,19 @@ export class EndScene extends Phaser.Scene {
     // Score submission logic
     if (this.endGameData.score > 0) {
       this.submitScore(this.endGameData.score);
+    }
+
+    // Save dialogue history
+    if (this.endGameData.playerId) {
+      this.submissionStatusText.setText("Saving dialogue history...");
+      this.submissionStatusText.setAlpha(1);
+      endGame(this.endGameData.playerId).then(result => {
+        if (result && result.status === "success") {
+          this.submissionStatusText.setText("Dialogue history saved!");
+        } else {
+          this.submissionStatusText.setText("Failed to save dialogue history.");
+        }
+      });
     }
   }
 
@@ -437,6 +451,36 @@ export class EndScene extends Phaser.Scene {
     } catch (error) {
       this.submissionStatusText.setText("Failed to submit score. See console.");
       console.error("Score submission failed:", error);
+    }
+  }
+
+  async saveDialogueToStorage() {
+    const backendUrl = "http://127.0.0.1:8000";  // Same as your game backend
+    
+    try {
+      console.log(`💾 Calling backend to save dialogue for game: ${this.gameData.gameId}`);
+      
+      const response = await fetch(`${backendUrl}/game/end`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          game_id: this.gameData.gameId,
+          player_id: this.walletAddress,
+        }),
+        timeout: 120000, // 2 minute timeout
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log("✅ Backend saved dialogue history!", result);
+      } else {
+        const error = await response.text();
+        console.error("❌ Backend failed to save dialogue:", error);
+      }
+    } catch (error) {
+      console.error("💥 Error calling backend /game/end:", error);
     }
   }
 }

@@ -12,10 +12,14 @@ export function setCurrentGameId(gameId) {
     currentGameId = gameId;
 }
 
-async function startNewGame(difficulty) {
+async function startNewGame(difficulty, playerId = null) {
   try {
     console.log("Difficulty level - ", difficulty);
-    const response = await fetch(`${API_BASE_URL}/game/new`, {
+    let url = `${API_BASE_URL}/game/new`;
+    if (playerId) {
+      url += `?player_id=${playerId}`;
+    }
+    const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -72,10 +76,7 @@ async function getConversation(villagerId, playerMessage, playerId = null) {
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        villager_id: villagerId,
-        player_prompt: playerMessage, // CHANGED: was player_message
-      }),
+      body: JSON.stringify(requestBody),
     });
     
     if (!response.ok) {
@@ -160,9 +161,41 @@ async function pingServer() {
   }
 }
 
+async function endGame(playerId) {
+  if (!currentGameId) {
+    console.error("Cannot end game: no active game ID.");
+    return null;
+  }
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/game/end`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        game_id: currentGameId,
+        player_id: playerId,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log('Game ended:', data);
+    return data;
+  } catch (error) {
+    console.error("Error ending game:", error);
+    return null;
+  }
+}
+
 export { 
   startNewGame, 
   getConversation, 
   chooseLocation, 
-  pingServer
+  pingServer,
+  endGame
 };

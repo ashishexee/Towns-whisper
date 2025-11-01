@@ -61,27 +61,40 @@ app.post("/dialogue/:walletAddress", async (req, res) => {
 app.post("/dialogue/history/:walletAddress", async (req, res) => {
   try {
     const { walletAddress } = req.params;
-    const fullHistory = req.body;
-
-    if (!fullHistory || !fullHistory.dialogue_history) {
-      return res
-        .status(400)
-        .json({ message: "Missing 'dialogue_history' object in request body." });
+    console.log(`\n📝 ========== /dialogue/history ENDPOINT HIT ==========`);
+    console.log(`👤 Wallet: ${walletAddress}`);
+    console.log(`🔎 Payload size: ${JSON.stringify(req.body).length} bytes`);
+    console.log(`📦 Dialogue entries received: ${req.body.dialogue_history?.length || 0}`);
+    
+    if (req.body.dialogue_history && req.body.dialogue_history.length > 0) {
+      console.log(`🗨️  First dialogue:`, JSON.stringify(req.body.dialogue_history[0], null, 2));
     }
 
-    const success = await storageManager.saveFullDialogueHistory(
-      walletAddress,
-      JSON.stringify(fullHistory)
-    );
-
+    const success = await storageManager.saveFullDialogueHistory(walletAddress, req.body);
+    
     if (success) {
-      res.status(200).json({ message: "Full dialogue history saved successfully." });
+      console.log(`✅ Successfully saved full history for ${walletAddress}`);
+      console.log(`========== END /dialogue/history ==========\n`);
+      return res.status(200).json({ 
+        status: "ok",
+        message: "Dialogue history saved successfully",
+        entriesReceived: req.body.dialogue_history?.length || 0
+      });
     } else {
-      res.status(500).json({ message: "Failed to save full dialogue history." });
+      console.error(`❌ Failed to save for ${walletAddress}`);
+      console.log(`========== END /dialogue/history (FAILED) ==========\n`);
+      return res.status(500).json({ 
+        status: "error", 
+        message: "save failed" 
+      });
     }
   } catch (error) {
-    console.error(`Error saving full history: ${error.message}`);
-    res.status(500).json({ message: "Failed to save full dialogue history." });
+    console.error("Error in /dialogue/history:", error);
+    console.log(`========== END /dialogue/history (ERROR) ==========\n`);
+    return res.status(500).json({ 
+      status: "error", 
+      message: error?.message || String(error) 
+    });
   }
 });
 

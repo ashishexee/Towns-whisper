@@ -444,6 +444,7 @@ export class UIScene extends Phaser.Scene {
             isStaking: homeScene.isStaking,
             elapsedTime: this.elapsedSeconds,
             timeLimit: homeScene.timeLimit,
+            playerId: this.account, // Pass the player's account ID
           });
         });
       } else {
