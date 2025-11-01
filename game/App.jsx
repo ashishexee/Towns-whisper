@@ -188,7 +188,7 @@ function App() {
     
     try {
       console.log('Creating room...');
-      const response = await fetch('http://127.0.0.1:8000/create_room', {
+      const response = await fetch('https://towns-whisper-backend-0g-storage.onrender.com/create_room', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

@@ -455,7 +455,7 @@ export class EndScene extends Phaser.Scene {
   }
 
   async saveDialogueToStorage() {
-    const backendUrl = "http://127.0.0.1:8000";  // Same as your game backend
+    const backendUrl = "https://towns-whisper-backend-0g-storage.onrender.com";  // Same as your game backend
     
     try {
       console.log(`💾 Calling backend to save dialogue for game: ${this.gameData.gameId}`);

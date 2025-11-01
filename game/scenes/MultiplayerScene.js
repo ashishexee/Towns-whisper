@@ -453,7 +453,7 @@ export class MultiplayerScene extends Phaser.Scene {
 
     try {
       this.ws = new WebSocket(
-        `ws://localhost:8000/ws/${this.roomId}/${this.playerId}`
+        `wss://towns-whisper-backend-0g-storage.onrender.com/ws/${this.roomId}/${this.playerId}`
       );
 
       this.ws.onopen = () => {

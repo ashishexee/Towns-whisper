@@ -18,7 +18,7 @@ const RoomLobby = ({ roomId, onStart, onClose, playerId }) => {
 
         const connectWebSocket = () => {
             try {
-                const websocket = new WebSocket(`ws://localhost:8000/ws/${roomId}/${playerId}`);
+                const websocket = new WebSocket(`wss://towns-whisper-backend-0g-storage.onrender.com/ws/${roomId}/${playerId}`);
                 wsRef.current = websocket;
                 
                 websocket.onopen = () => {
