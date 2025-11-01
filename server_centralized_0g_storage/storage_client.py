@@ -2,7 +2,7 @@ import httpx
 import os
 from typing import Dict, Any, Optional
 
-STORAGE_SERVICE_URL = os.getenv("STORAGE_SERVICE_URL", "http://localhost:3002")
+STORAGE_SERVICE_URL = os.getenv("STORAGE_SERVICE_URL", "https://towns-whisper-0g-storage-service.onrender.com")
 
 async def get_dialogue_history(wallet_address: str) -> Optional[Dict[str, Any]]:
     """Fetches the entire dialogue history for a given wallet address from 0G Storage."""
