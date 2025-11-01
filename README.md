@@ -13,9 +13,9 @@ Guided by a mysterious disembodied voice (powered by Text-to-Speech), you begin 
 ![System Architecture](assets/towns_whispers_flow.svg)
 
 ### 0G MAINNET Deployed Contracts
-*   **User Registry:** `0xdb408c192627ed0f58a9a649398b5e63e2a891ab` - [Verified Contract](https://explorer.0g.ai/mainnet/blockchain/accounts/0xdb408c192627ed0f58a9a649398b5e63e2a891ab/verified-contracts)
-*   **Game Items:** `0x8532e63564c90c5fc88591e2d1e1a25ce547f173` - [Verified Contract](https://explorer.0g.ai/mainnet/blockchain/accounts/0x8532e63564c90c5fc88591e2d1e1a25ce547f173/verified-contracts)
-*   **Staking Manager:** `0x1ad6fe40d6b84fe271ec30af5922ad9f8a84b9b0` - [Verified Contract](https://explorer.0g.ai/mainnet/blockchain/accounts/0x1ad6fe40d6b84fe271ec30af5922ad9f8a84b9b0/verified-contracts)
+*   **User Registry:** `0xdb408c192627ed0f58a9a649398b5e63e2a891ab` - [Verified Contract](https://chainscan.0g.ai/address/0xdb408c192627ed0f58a9a649398b5e63e2a891ab?tab=contract-viewer)
+*   **Game Items:** `0xda3208af06f0a436426363ab48faf4aef2d2dd17` - [Verified Contract](https://chainscan.0g.ai/address/0xda3208af06f0a436426363ab48faf4aef2d2dd17?tab=contract-viewer)
+*   **Staking Manager:** `0x0fd3d54cd0f292d1b85ec069d3e6f09072050d33` - [Verified Contract](https://chainscan.0g.ai/address/0x0fd3d54cd0f292d1b85ec069d3e6f09072050d33?tab=contract-viewer)
 
 
 ### STORAGE Submissions
