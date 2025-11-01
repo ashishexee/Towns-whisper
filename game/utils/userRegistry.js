@@ -9,7 +9,7 @@ const USER_REGISTRY_ABI = [
     "event UserRegistered(address indexed userAddress, string username, uint256 timestamp)"
 ];
 
-const USER_REGISTRY_ADDRESS = "0x5133fa99d718111fb6a708bee4ffe935fb529d1b"; // contracts deployed on 0g testnet
+const USER_REGISTRY_ADDRESS = "0xdb408c192627ed0f58a9a649398b5e63e2a891ab"; // contracts deployed on 0g testnet
 
 export class UserRegistryService {
     constructor(provider, signer) {
