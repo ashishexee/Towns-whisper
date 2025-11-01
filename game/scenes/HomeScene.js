@@ -1577,7 +1577,7 @@ async initiateConversation(villager) {
       const stakingContract = new ethers.Contract(CONTRACT_ADDRESSES.stakingManager, STAKING_MANAGER_ABI, signer);
 
       statusText.setText("Please confirm in wallet...");
-      const penaltyAmount = ethers.parseEther("0.01");
+      const penaltyAmount = ethers.parseEther("0.001");
       
       const tx = await stakingContract.depositFundsForHint({ value: penaltyAmount });
 

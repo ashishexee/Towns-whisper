@@ -490,7 +490,7 @@ export class UIScene extends Phaser.Scene {
     const gameScene = this.scene.get(this.callingScene);
 
     if (gameScene && gameScene.wrongLocationChosen) {
-      this.locationButton.setText("Deposit 0.01 G");
+      this.locationButton.setText("Deposit 0.001 G");
       this.locationButton.setBackgroundColor("#992222");
       this.locationButton.setColor("#ffffff");
       this.locationButtonEnabled = true;
