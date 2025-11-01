@@ -16,7 +16,7 @@ Guided by a mysterious disembodied voice (powered by Text-to-Speech), you begin 
 *   **User Registry:** `0xdb408c192627ed0f58a9a649398b5e63e2a891ab` - [Verified Contract](https://explorer.0g.ai/mainnet/blockchain/accounts/0xdb408c192627ed0f58a9a649398b5e63e2a891ab/verified-contracts)
 *   **Game Items:** `0x8532e63564c90c5fc88591e2d1e1a25ce547f173` - [Verified Contract](https://explorer.0g.ai/mainnet/blockchain/accounts/0x8532e63564c90c5fc88591e2d1e1a25ce547f173/verified-contracts)
 *   **Staking Manager:** `0x1ad6fe40d6b84fe271ec30af5922ad9f8a84b9b0` - [Verified Contract](https://explorer.0g.ai/mainnet/blockchain/accounts/0x1ad6fe40d6b84fe271ec30af5922ad9f8a84b9b0/verified-contracts)
-*   **Trade Manager:** `0x79475AD66448E206F77467A8d0F0F0b23337eA31` - [Verified Contract](https://explorer.0g.ai/mainnet/blockchain/accounts/0x79475AD66448E206F77467A8d0F0F0b23337eA31/verified-contracts)
+
 
 ### STORAGE Submissions
 You can view storage submissions on the mainnet here: [0G Mainnet Explorer](https://explorer.0g.ai/mainnet/blockchain/accounts/0xda7b4319693628233ee3b3957543941edc5ffac6/submissions)
