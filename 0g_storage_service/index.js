@@ -295,6 +295,6 @@ app.get('/inft/player/:address', async (req, res) => {
     }
 });
 
-app.listen(port, () => {
+app.listen(PORT, () => {
   console.log(`✅ 0G Storage Service listening at http://localhost:${port}`);
 });
