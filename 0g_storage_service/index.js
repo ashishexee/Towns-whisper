@@ -6,7 +6,7 @@ import { INFTManager } from './INFTManager.js';
 const app = express();
 app.use(cors());
 app.use(express.json());
-const PORT = process.env.PORT || 3002;
+const port = process.env.PORT || 3002;
 const storageManager = new StorageManager();
 const inftManager = new INFTManager();
 
@@ -295,6 +295,6 @@ app.get('/inft/player/:address', async (req, res) => {
     }
 });
 
-app.listen(PORT, () => {
+app.listen(port, () => {
   console.log(`✅ 0G Storage Service listening at http://localhost:${port}`);
 });
