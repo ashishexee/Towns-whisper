@@ -24,6 +24,14 @@ The `bridge_server` is the core component of our decentralized AI integration. I
 4.  **On-Chain Verification:** After receiving the AI-generated narrative, the server verifies the response on-chain. This ensures the integrity of the content and prevents tampering.
 
 This decentralized approach to AI not only enhances the game's dynamism but also adds a layer of security and transparency that would be difficult to achieve with a traditional centralized AI service.
+### 0G MAINNET Deployed Contracts
+*   **User Registry:** `0xdb408c192627ed0f58a9a649398b5e63e2a891ab` - [Verified Contract](https://explorer.0g.ai/mainnet/blockchain/accounts/0xdb408c192627ed0f58a9a649398b5e63e2a891ab/verified-contracts)
+*   **Game Items:** `0x8532e63564c90c5fc88591e2d1e1a25ce547f173` - [Verified Contract](https://explorer.0g.ai/mainnet/blockchain/accounts/0x8532e63564c90c5fc88591e2d1e1a25ce547f173/verified-contracts)
+*   **Staking Manager:** `0x1ad6fe40d6b84fe271ec30af5922ad9f8a84b9b0` - [Verified Contract](https://explorer.0g.ai/mainnet/blockchain/accounts/0x1ad6fe40d6b84fe271ec30af5922ad9f8a84b9b0/verified-contracts)
+*   **Trade Manager:** `0x79475AD66448E206F77467A8d0F0F0b23337eA31` - [Verified Contract](https://explorer.0g.ai/mainnet/blockchain/accounts/0x79475AD66448E206F77467A8d0F0F0b23337eA31/verified-contracts)
+
+### STORAGE Submissions
+You can view storage submissions on the mainnet here: [0G Mainnet Explorer](https://explorer.0g.ai/mainnet/blockchain/accounts/0xda7b4319693628233ee3b3957543941edc5ffac6/submissions)
 
 ### 0G Storage
 
@@ -213,10 +221,9 @@ Towns-whisper/
     npm run dev
     ```
 
-## Smart Contracts
-
-### Deployed Addresses
+### Testnet Deployed Addresses
 
 *   **User Registry:** `0x5133fa99d718111fb6a708bee4ffe935fb529d1b`
 *   **Game Items:** `0xf80c2f2ac5ed19f609071c06efd21eab686436f5`
 *   **Staking Manager:** `0x0d6c4d4046cdf8ca49ffaae4cf10b6bf7f1d7dc9`
+*   **iNFT Contract:** `0x494d8E03605E297F936a6F244B7BcD03e4563D7E`
