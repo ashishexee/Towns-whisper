@@ -6,8 +6,7 @@ import { INFTManager } from './INFTManager.js';
 const app = express();
 app.use(cors());
 app.use(express.json());
-const port = 3002;
-
+const PORT = process.env.PORT || 3002;
 const storageManager = new StorageManager();
 const inftManager = new INFTManager();
 
