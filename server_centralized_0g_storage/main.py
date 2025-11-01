@@ -50,7 +50,7 @@ game_engine = None
 # In-memory storage for user login tracking
 user_login_history = {}
 
-STORAGE_SERVICE_URL = "http://localhost:3002"
+STORAGE_SERVICE_URL = "https://towns-whisper-0g-storage-service.onrender.com"
 
 # --- NEW HELPER FUNCTION ---
 async def get_dialogue_history(player_id: str) -> Optional[Dict]:

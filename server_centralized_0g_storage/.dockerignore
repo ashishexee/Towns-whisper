@@ -1,0 +1,9 @@
+# filepath: f:\Towns-whisper\server_centralized_0g_storage\.dockerignore
+
+.venv
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.env
