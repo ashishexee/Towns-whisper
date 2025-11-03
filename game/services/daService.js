@@ -4,7 +4,7 @@
  * Non-blocking: Game continues even if DA fails
  */
 
-const DA_SERVICE_URL = 'http://localhost:3002/da/disperse';
+const DA_SERVICE_URL = 'https://towns-whisper-0g-storage-service.onrender.com/da/disperse';
 
 class DAService {
     constructor() {

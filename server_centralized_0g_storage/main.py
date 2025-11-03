@@ -26,14 +26,11 @@ load_dotenv()
 app = FastAPI()
 
 # Add CORS middleware to allow requests from your frontend
-origins = [
-    "http://localhost",
-    "http://localhost:5173", # Adjust if your frontend runs on a different port
-]
+
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

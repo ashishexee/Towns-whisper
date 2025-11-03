@@ -1758,7 +1758,7 @@ async initiateConversation(villager) {
         });
 
         console.log('📡 Making INFT creation request...');
-        const response = await fetch('http://localhost:3002/inft/create', {
+        const response = await fetch('https://towns-whisper-0g-storage-service.onrender.com/inft/create', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -1795,7 +1795,7 @@ async generatePlayerKeypair() {
     // For now, generate and store locally
     if (this.playerKeypair) return this.playerKeypair;
 
-    const response = await fetch('http://localhost:3002/crypto/generate-keypair', {
+    const response = await fetch('https://towns-whisper-0g-storage-service.onrender.com/crypto/generate-keypair', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1829,7 +1829,7 @@ async updateINFTProgress() {
             playDurationSeconds: Math.floor((Date.now() - this.gameStartTime) / 1000)
         };
 
-        const response = await fetch('http://localhost:3002/inft/evolve', {
+        const response = await fetch('https://towns-whisper-0g-storage-service.onrender.com/inft/evolve', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
