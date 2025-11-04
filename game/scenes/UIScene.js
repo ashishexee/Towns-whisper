@@ -369,6 +369,7 @@ export class UIScene extends Phaser.Scene {
     });
   }
 
+
   async selectLocation(location) {
     if (this._locationOverlay) {
       this._locationOverlay.destroy();
@@ -393,73 +394,64 @@ export class UIScene extends Phaser.Scene {
       .setDepth(2501)
       .setScrollFactor(0);
 
-    if (this.callingScene === "MultiplayerScene") {
-      const multiplayerScene = this.scene.get("MultiplayerScene");
-      multiplayerScene.handleGuess(location);
-      feedbackText.destroy();
-    } else {
-      const result = await chooseLocation(location);
-      if (!result) {
-        feedbackText.setText("Error: Game session not found.");
-        this.time.delayedCall(2000, () => {
-          this.scene.stop("HomeScene");
-          this.scene.start("MenuScene");
-        });
-        return;
-      }
+    // --- THIS IS THE UNIFIED LOGIC ---
+    const gameScene = this.scene.get(this.callingScene);
+    const result = await chooseLocation(location, gameScene.playerId || gameScene.account);
 
-      if (result.is_correct) {
-        feedbackText.setText(`Investigation successful!`);
+    if (!result) {
+      feedbackText.setText("Error: Game session not found.");
+      this.time.delayedCall(2000, () => {
+        gameScene.scene.stop(this.callingScene);
+        gameScene.scene.start("MenuScene");
+      });
+      return;
+    }
 
-        this.time.delayedCall(1500, async () => {
-          const homeScene = this.scene.get("HomeScene");
-
-          let baseScore = 0;
-
-          const difficultyMultipliers = {
-            "Very Easy": 0.5,
-            Easy: 1,
-            Medium: 1.5,
-            Hard: 2,
-          };
-          const difficultyMultiplier =
-            difficultyMultipliers[this.difficulty] || 1;
-          const timeBonus =
-            Math.max(0, 600 - this.elapsedSeconds) * 10 * difficultyMultiplier;
-          const guessPenalty =
-            homeScene.guessCount * 500 * difficultyMultiplier;
-          const nftBonus = homeScene.nftCount * 2000 * difficultyMultiplier;
-          const finalScore = baseScore + timeBonus - guessPenalty + nftBonus;
+    if (result.is_correct) {
+      feedbackText.setText(`Investigation successful!`);
+      // For multiplayer, emit the 'game_won' event
+      if (this.callingScene === "MultiplayerScene" && gameScene.ws && gameScene.ws.readyState === WebSocket.OPEN) {
+        console.log("Correct guess! Notifying server that game is won.");
+        gameScene.ws.send(JSON.stringify({ type: "game_won" }));
+      } else {
+        // Handle single-player win logic (which transitions to EndScene)
+        this.time.delayedCall(1500, () => {
+          // ... (existing single-player score calculation and scene transition) ...
+          const difficultyMultipliers = { "Very Easy": 0.5, Easy: 1, Medium: 1.5, Hard: 2 };
+          const difficultyMultiplier = difficultyMultipliers[this.difficulty] || 1;
+          const timeBonus = Math.max(0, 600 - this.elapsedSeconds) * 10 * difficultyMultiplier;
+          const guessPenalty = gameScene.guessCount * 500 * difficultyMultiplier;
+          const nftBonus = gameScene.nftCount * 2000 * difficultyMultiplier;
+          const finalScore = timeBonus - guessPenalty + nftBonus;
 
           this.scene.stop("HomeScene");
           this.scene.stop("UIScene");
           this.scene.start("EndScene", {
             score: Math.round(finalScore),
             time: this.formatTime(this.elapsedSeconds),
-            guesses: homeScene.guessCount,
-            nfts: homeScene.nftCount,
+            guesses: gameScene.guessCount,
+            nfts: gameScene.nftCount,
             account: this.account,
             story: result.story,
             isCorrect: true,
-            isStaking: homeScene.isStaking,
+            isStaking: gameScene.isStaking,
             elapsedTime: this.elapsedSeconds,
-            timeLimit: homeScene.timeLimit,
-            playerId: this.account, // Pass the player's account ID
+            timeLimit: gameScene.timeLimit,
+            playerId: this.account,
           });
         });
-      } else {
-        feedbackText.setText(`Nothing found at ${location}. Try again.`);
-        this.homeScene.guessCount++;
-        if (this.homeScene.isStaking) {
-          this.homeScene.guessMade = true;
-        } else {
-          this.homeScene.wrongLocationChosen = true;
-        }
-        this.updateLocationButtonState();
-        this.time.delayedCall(2000, () => {
-          feedbackText.destroy();
-        });
       }
+    } else {
+      // This block now handles incorrect guesses for BOTH modes
+      feedbackText.setText(`Nothing found at ${location}. Try again.`);
+      gameScene.guessCount = (gameScene.guessCount || 0) + 1;
+      gameScene.wrongLocationChosen = true;
+      
+      this.updateLocationButtonState(); // Explicitly update the UI
+      
+      this.time.delayedCall(2000, () => {
+        feedbackText.destroy();
+      });
     }
   }
 

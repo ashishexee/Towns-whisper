@@ -901,27 +901,38 @@ export class MultiplayerScene extends Phaser.Scene {
   }
 
   async handleGuess(location) {
-    if (this.gameWon) return;
+    // if (this.gameWon) return;
 
-    try {
-      const result = await chooseLocation(location, this.playerId);
-      const uiScene = this.scene.get("UIScene");
+    // try {
+    //   const result = await chooseLocation(location, this.playerId);
+    //   const uiScene = this.scene.get("UIScene");
 
-      if (result && result.is_correct) {
-        console.log("Correct guess! Waiting for server to end the game.");
-      } else if (result && result.requires_deposit) {
-        this.wrongLocationChosen = true;
-        this.showErrorMessage(result.message);
-        if (uiScene) {
-          uiScene.updateLocationButtonState();
-        }
-      } else {
-        this.showErrorMessage(result.message || "Incorrect guess.");
-      }
-    } catch (error) {
-      console.error("Error making guess:", error);
-      this.showErrorMessage("An error occurred while making a guess.");
-    }
+    //   if (result && result.is_correct) {
+    //     // --- THIS IS THE KEY CHANGE ---
+    //     // The guess was correct. Tell the server we won.
+    //     console.log("Correct guess! Notifying server that game is won.");
+    //     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+    //       this.ws.send(JSON.stringify({ type: "game_won" }));
+    //     }
+        
+    //   }
+    //   else if (result && result.requires_deposit) {
+    //     this.wrongLocationChosen = true;
+    //     this.showErrorMessage(result.message);
+        
+    //     if (uiScene) {
+    //       uiScene.updateLocationButtonState();
+    //     }
+        
+    //   } else {
+    //     // Handle other cases or generic incorrect guess messages
+    //     this.showErrorMessage(result ? result.message : "An unknown error occurred.");
+    //   }
+    // } catch (error) {
+    //   console.error("Error making guess:", error);
+    //   this.showErrorMessage("An error occurred while making a guess.");
+    // }
+    console.log('handleguess called')
   }
 
   handleGameEnd(winnerId, winnerName) {
@@ -1457,7 +1468,7 @@ export class MultiplayerScene extends Phaser.Scene {
       const stakingContract = new ethers.Contract(CONTRACT_ADDRESSES.stakingManager, STAKING_MANAGER_ABI, signer);
 
       statusText.setText("Please confirm in wallet...");
-      const penaltyAmount = ethers.parseEther("0.01");
+      const penaltyAmount = ethers.parseEther("0.001");
       
       const tx = await stakingContract.depositFundsForHint({ value: penaltyAmount });
 
@@ -1465,6 +1476,13 @@ export class MultiplayerScene extends Phaser.Scene {
       await tx.wait();
 
       statusText.setText("Penalty paid successfully!");
+
+       this.wrongLocationChosen = false;
+      const uiScene = this.scene.get("UIScene");
+      if (uiScene) {
+        uiScene.updateLocationButtonState();
+      }
+      
       this.time.delayedCall(2000, () => {
         statusText.destroy();
         this.input.keyboard.enabled = true;
