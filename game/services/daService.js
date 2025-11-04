@@ -38,11 +38,9 @@ class DAService {
             if (result.result == 'FAILURE') {
                 return { success: true, requestId: result.request_id };
             } else {
-                console.warn('⚠️ DA dispersal failed:', result.message);
                 return { success: false, reason: result.message };
             }
         } catch (error) {
-            console.error('❌ DA dispersal error:', error.message);
             return { success: false, reason: error.message };
         }
     }
@@ -54,7 +52,6 @@ class DAService {
         this.disperseEvent(data, description, true)
             .then(() => {})
             .catch(err => {
-                console.error('Critical event dispersal failed (ignored):', err);
             });
     }
 
