@@ -255,6 +255,11 @@ async def interact(game_id: str, request: InteractRequest):
         
         if not hasattr(game_state, 'multiplayer_memories'):
             game_state.multiplayer_memories = {}
+        if player_key not in game_state.multiplayer_memories:
+            print(f"Initializing new memory for player: {player_key}")
+            game_state.multiplayer_memories[player_key] = {
+                v["name"]: [] for v in game_state.villagers
+            }
         
         # --- REMOVED LOGIC TO LOAD HISTORY ---
         # This logic has been moved to the /game/new endpoint
