@@ -5,8 +5,8 @@ import ERC20_ABI_JSON from '../game/abi/abi_erc20.json' assert { type: 'json' };
 
 // Define your contract addresses
 const addresses = {
-    gameItems: '0xf80c2f2ac5ed19f609071c06efd21eab686436f5',   // depoyed the contract on 0g testnet
-    stakingManager: '0x0d6c4d4046cdf8ca49ffaae4cf10b6bf7f1d7dc9', // sepolia Testnet Deployed Contract
+    gameItems: '0xda3208af06f0a436426363ab48faf4aef2d2dd17',   // depoyed the contract on 0g testnet
+    stakingManager: '0x0fd3d54cd0f292d1b85ec069d3e6f09072050d33', // sepolia Testnet Deployed Contract
     tradeManager: '0x79475AD66448E206F77467A8d0F0F0b23337eA31', 
     runeCoin: '0x0000000000000000000000000000000000697ded' 
 };

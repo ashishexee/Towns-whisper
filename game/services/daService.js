@@ -4,7 +4,7 @@
  * Non-blocking: Game continues even if DA fails
  */
 
-const DA_SERVICE_URL = 'http://localhost:3002/da/disperse';
+const DA_SERVICE_URL = 'https://towns-whisper-0g-storage-service.onrender.com/da/disperse';
 
 class DAService {
     constructor() {
@@ -16,11 +16,9 @@ class DAService {
      */
     async disperseEvent(data, description, critical = false) {
         if (!this.enabled) {
-            console.log('🔕 DA dispersal disabled');
             return { success: false, reason: 'disabled' };
         }
 
-        console.log(`📡 Attempting to disperse: ${description}`);
         
         try {
             const response = await fetch(DA_SERVICE_URL, {
@@ -36,20 +34,13 @@ class DAService {
             });
 
             const result = await response.json();
-            console.log(response);
 
             if (result.result == 'FAILURE') {
-                console.log('✅ DA dispersal successful:', result.request_id);
-                if (critical) {
-                    console.log('🎉 Critical event secured on DA');
-                }
                 return { success: true, requestId: result.request_id };
             } else {
-                console.warn('⚠️ DA dispersal failed:', result.message);
                 return { success: false, reason: result.message };
             }
         } catch (error) {
-            console.error('❌ DA dispersal error:', error.message);
             return { success: false, reason: error.message };
         }
     }
@@ -59,19 +50,13 @@ class DAService {
      */
     disperseCriticalEvent(data, description) {
         this.disperseEvent(data, description, true)
-            .then(result => {
-                if (result.success) {
-                    console.log(`🎉 Critical event secured: ${description}`);
-                }
-            })
+            .then(() => {})
             .catch(err => {
-                console.error('Critical event dispersal failed (ignored):', err);
             });
     }
 
     setEnabled(enabled) {
         this.enabled = enabled;
-        console.log(`DA dispersal ${enabled ? 'enabled' : 'disabled'}`);
     }
 }
 

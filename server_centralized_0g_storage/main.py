@@ -11,7 +11,7 @@ from pydantic import BaseModel
 import requests # Ensure requests is imported
 import json
 from schemas import *
-from datetime import datetime
+from datetime import datetime, timedelta
 from game_logic.engine import GameEngine
 from game_logic.state_manager import GameState
 # Import our new Hedera service function
@@ -26,14 +26,11 @@ load_dotenv()
 app = FastAPI()
 
 # Add CORS middleware to allow requests from your frontend
-origins = [
-    "http://localhost",
-    "http://localhost:5173", # Adjust if your frontend runs on a different port
-]
+
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -50,7 +47,7 @@ game_engine = None
 # In-memory storage for user login tracking
 user_login_history = {}
 
-STORAGE_SERVICE_URL = "http://localhost:3002"
+STORAGE_SERVICE_URL = "https://towns-whisper-0g-storage-service.onrender.com"
 
 # --- NEW HELPER FUNCTION ---
 async def get_dialogue_history(player_id: str) -> Optional[Dict]:
@@ -193,7 +190,7 @@ class ConnectionManager:
 manager = ConnectionManager()
 
 @app.post("/game/new", response_model=NewGameResponse)
-async def create_new_game(request: NewGameRequest):
+async def create_new_game(request: NewGameRequest, player_id: Optional[str] = None):
     game_id = str(uuid.uuid4())
     try:
         game_state = game_engine.start_new_game(
@@ -203,6 +200,17 @@ async def create_new_game(request: NewGameRequest):
         )
         active_games[game_id] = game_state
         
+        if player_id:
+            history_data = await get_dialogue_history(player_id)
+            reconstructed_memory = {v["name"]: [] for v in game_state.villagers}
+            if history_data and history_data.get("dialogue_history"):
+                for entry in history_data["dialogue_history"]:
+                    villager = entry.get("villager_name")
+                    if villager in reconstructed_memory:
+                        reconstructed_memory[villager].append({"role": "player", "content": entry.get("player_prompt")})
+                        reconstructed_memory[villager].append({"role": "npc", "content": entry.get("npc_dialogue")})
+            game_state.multiplayer_memories = {player_id: reconstructed_memory}
+
         initial_villagers = [
             {"id": f"villager_{i}", "title": v["title"]} 
             for i, v in enumerate(game_state.villagers)
@@ -247,25 +255,15 @@ async def interact(game_id: str, request: InteractRequest):
         
         if not hasattr(game_state, 'multiplayer_memories'):
             game_state.multiplayer_memories = {}
+        if player_key not in game_state.multiplayer_memories:
+            print(f"Initializing new memory for player: {player_key}")
+            game_state.multiplayer_memories[player_key] = {
+                v["name"]: [] for v in game_state.villagers
+            }
         
-        # --- MODIFIED LOGIC TO LOAD HISTORY ---
-        # Check if memory is uninitialized (i.e., first interaction for this player in this session)
-        if player_key not in game_state.multiplayer_memories or not any(game_state.multiplayer_memories[player_key].values()):
-            history_data = await get_dialogue_history(player_key)
-            
-            reconstructed_memory = {v["name"]: [] for v in game_state.villagers}
-            if history_data and history_data.get("dialogue_history"):
-                print(f"✅ Successfully loaded {len(history_data['dialogue_history'])} dialogue entries for {player_key}.")
-                for entry in history_data["dialogue_history"]:
-                    villager = entry.get("villager_name")
-                    if villager in reconstructed_memory:
-                        reconstructed_memory[villager].append({"role": "player", "content": entry.get("player_prompt")})
-                        reconstructed_memory[villager].append({"role": "npc", "content": entry.get("npc_dialogue")})
-            else:
-                print(f"ℹ️ No persistent history found for {player_key}, or service is unavailable. Starting with a fresh session.")
-            
-            game_state.multiplayer_memories[player_key] = reconstructed_memory
-        # --- END MODIFIED LOGIC ---
+        # --- REMOVED LOGIC TO LOAD HISTORY ---
+        # This logic has been moved to the /game/new endpoint
+        # --- END REMOVED LOGIC ---
 
         player_state = game_state.multiplayer_states[player_key]
         player_memory = game_state.multiplayer_memories[player_key]
@@ -356,35 +354,50 @@ async def end_game(request: EndGameRequest):
     game_id = request.game_id
     player_id = request.player_id
 
+    print(f"\n🎮 ========== /game/end ENDPOINT HIT ==========")
+    print(f"Game ID: {game_id}")
+    print(f"Player ID: {player_id}")
+
     if game_id not in active_games:
-        # It's possible the game was already cleaned up, which is not an error.
+        print(f"⚠️  Game {game_id} not found in active_games")
         return {"status": "success", "message": "Game session not found or already ended."}
 
     game_state = active_games[game_id]
-    player_memory = game_state.multiplayer_memories.get(player_id)
+    player_key = player_id if player_id else "single_player"
+    player_memory = game_state.multiplayer_memories.get(player_key)
+
+    print(f"📝 Player key: {player_key}")
+    print(f"📊 Player memory exists: {player_memory is not None}")
 
     if not player_memory:
-        # No memory to save, so we can just clean up.
-        del active_games[game_id]
+        print(f"❌ No memory found for {player_key}")
+        if game_id in active_games:
+            del active_games[game_id]
         return {"status": "success", "message": "No dialogue history to save."}
 
     # Reconstruct the dialogue history from the session memory
     dialogue_history_list = []
     for villager, turns in player_memory.items():
+        print(f"  Processing villager: {villager} ({len(turns)} turns)")
         # Each turn consists of a player message and an NPC response
         for i in range(0, len(turns), 2):
             if i + 1 < len(turns) and turns[i]['role'] == 'player' and turns[i+1]['role'] == 'npc':
-                dialogue_history_list.append({
-                    "villager": villager,
-                    "player": turns[i]['content'],
-                    "npc": turns[i+1]['content'],
-                    "timestamp": datetime.now().isoformat() # Add timestamp at save time
-                })
+                dialogue_entry = {
+                    "villager_name": villager,
+                    "villager_id": villager.lower(),
+                    "player_prompt": turns[i]['content'],
+                    "npc_dialogue": turns[i+1]['content'],
+                    "timestamp": datetime.now().isoformat()
+                }
+                dialogue_history_list.append(dialogue_entry)
+    
+    print(f"✅ Reconstructed {len(dialogue_history_list)} dialogue entries")
     
     if dialogue_history_list:
         # Fetch the old history to append the new session's history
-        # This ensures we don't lose history from previous games
-        existing_history = await get_dialogue_history(player_id)
+        existing_history = await get_dialogue_history(player_key)
+        print(f"📚 Existing history entries: {len(existing_history.get('dialogue_history', [])) if existing_history else 0}")
+        
         if existing_history and "dialogue_history" in existing_history:
             full_history = existing_history["dialogue_history"] + dialogue_history_list
         else:
@@ -392,11 +405,24 @@ async def end_game(request: EndGameRequest):
             
         final_payload = {"dialogue_history": full_history}
         
-        print(f"Saving {len(dialogue_history_list)} new dialogue entries for player {player_id}...")
-        await save_full_dialogue_history(player_id, final_payload)
+        print(f"💾 Saving {len(dialogue_history_list)} new dialogue entries for player {player_id}...")
+        print(f"📦 Total history size: {len(full_history)} entries")
+        
+        # THIS IS THE KEY CALL - ACTUALLY SAVE TO 0G STORAGE
+        success = await save_full_dialogue_history(player_id, final_payload)
+        
+        if success:
+            print(f"✅ Successfully saved dialogue history for {player_id} to 0G Storage!")
+        else:
+            print(f"❌ Failed to save dialogue history for {player_id}")
+    else:
+        print(f"⚠️  No dialogue entries to save")
 
     # Clean up the completed game from memory
-    del active_games[game_id]
+    if game_id in active_games:
+        del active_games[game_id]
+    
+    print(f"========== END /game/end ==========\n")
     
     return {"status": "success", "message": "Dialogue history saved and game session ended."}
 # ----------------------------------------------------
@@ -863,6 +889,7 @@ async def get_room(room_id: str):
         "winner": room.get("winner")
     }
 
+
 @app.websocket("/ws/{room_id}/{player_id}")
 async def websocket_endpoint(websocket: WebSocket, room_id: str, player_id: str):
     player_name = f"Player_{player_id[:8]}"
@@ -877,10 +904,19 @@ async def websocket_endpoint(websocket: WebSocket, room_id: str, player_id: str)
         room["players"].append({"id": player_id, "name": player_name})
     
     try:
-        # Send initial room state
+        # 1. Get the latest list of players
+        current_players = manager.get_room_players(room_id)
+
+        # 2. Notify all OTHER players that a new player has joined
+        await manager.broadcast_to_room({
+            "type": "player_joined",
+            "players": current_players
+        }, room_id, exclude_websocket=websocket)
+
+        # 3. Send the full room state to the NEWLY connected player
         await websocket.send_text(json.dumps({
             "type": "room_joined",
-            "players": manager.get_room_players(room_id),
+            "players": current_players,
             "room": multiplayer_rooms.get(room_id, {})
         }))
         

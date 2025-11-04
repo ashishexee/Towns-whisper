@@ -15,15 +15,19 @@ export class UIScene extends Phaser.Scene {
     this.resetHintText = null;
     this.inventoryButton = null;
     this.homeScene = null;
+    this.gameScene = null;
   }
 
   init(data) {
-    if (data && data.inaccessibleLocations) {
-      this.inaccessibleLocations = data.inaccessibleLocations;
+    if (data) {
+      this.inaccessibleLocations = data.inaccessibleLocations || [];
       this.account = data.account;
       this.difficulty = data.difficulty || "Easy";
+      this.callingScene = data.callingScene || "HomeScene";
+    } else {
+      this.inaccessibleLocations = [];
+      this.callingScene = "HomeScene";
     }
-    this.homeScene = this.scene.get("HomeScene");
   }
 
   create() {
@@ -46,9 +50,15 @@ export class UIScene extends Phaser.Scene {
       .setScrollFactor(0)
       .setDepth(0);
 
-    this.createLocationButton();
     this.createInventoryButton();
-    this.createGiveUpButton();
+    this.createLocationButton();
+
+    if (this.callingScene === "HomeScene") {
+      this.homeScene = this.scene.get("HomeScene");
+      this.createGiveUpButton();
+    }
+
+    this.updateLocationButtonState();
 
     this.time.addEvent({
       delay: 1000,
@@ -56,8 +66,6 @@ export class UIScene extends Phaser.Scene {
       callbackScope: this,
       loop: true,
     });
-
-    this.updateLocationButtonState();
   }
 
   createLocationButton() {
@@ -80,17 +88,12 @@ export class UIScene extends Phaser.Scene {
         return;
       }
 
-      if (this.homeScene.isStaking && this.homeScene.guessMade) {
-        const success = await this.homeScene.payGuessPenalty();
+      const gameScene = this.scene.get(this.callingScene);
+
+      if (gameScene && gameScene.wrongLocationChosen) {
+        const success = await gameScene.payGuessPenalty();
         if (success) {
-          this.homeScene.guessMade = false;
-          this.updateLocationButtonState();
-          this.showLocationChoices();
-        }
-      } else if (this.homeScene.wrongLocationChosen) {
-        const success = await this.homeScene.payGuessPenalty(); // Assuming the same penalty logic
-        if (success) {
-          this.homeScene.wrongLocationChosen = false;
+          gameScene.wrongLocationChosen = false;
           this.updateLocationButtonState();
           this.showLocationChoices();
         }
@@ -100,12 +103,16 @@ export class UIScene extends Phaser.Scene {
     });
 
     button.on("pointerover", () => {
-      if (this.locationButtonEnabled && !this.homeScene.wrongLocationChosen) {
+      const gameScene = this.scene.get(this.callingScene);
+      const isWrongChoice = gameScene && gameScene.wrongLocationChosen;
+      if (this.locationButtonEnabled && !isWrongChoice) {
         button.setBackgroundColor("#f5d56b");
       }
     });
     button.on("pointerout", () => {
-      if (this.locationButtonEnabled && !this.homeScene.wrongLocationChosen) {
+      const gameScene = this.scene.get(this.callingScene);
+      const isWrongChoice = gameScene && gameScene.wrongLocationChosen;
+      if (this.locationButtonEnabled && !isWrongChoice) {
         button.setBackgroundColor("#d4af37");
       }
     });
@@ -132,12 +139,49 @@ export class UIScene extends Phaser.Scene {
       .setDepth(300);
 
     button.on("pointerdown", () => {
-      const homeScene = this.scene.get("HomeScene");
-      if (homeScene && homeScene.scene.isActive()) {
-        homeScene.scene.pause();
-        this.scene.launch("InventoryScene", {
-          inventory: Array.from(homeScene.playerInventory),
-        });
+      console.log("[UIScene] Inventory button clicked.");
+      console.log(`[UIScene] Calling scene: ${this.callingScene}`);
+
+      const sourceScene = this.scene.get(this.callingScene);
+      if (sourceScene) {
+        console.log(`[UIScene] Found source scene: ${this.callingScene}`);
+        if (sourceScene.playerInventory) {
+          console.log(
+            "[UIScene] Player inventory found:",
+            sourceScene.playerInventory
+          );
+
+          let pausedByInventory = false;
+          if (
+            this.scene.isActive(this.callingScene) &&
+            !sourceScene.sys.isPaused()
+          ) {
+            console.log(
+              `[UIScene] Pausing active scene: ${this.callingScene}`
+            );
+            this.scene.pause(this.callingScene);
+            pausedByInventory = true;
+          } else {
+            console.log(
+              `[UIScene] Scene ${this.callingScene} is not active or already paused, not pausing.`
+            );
+          }
+
+          this.scene.launch("InventoryScene", {
+            inventory: sourceScene.playerInventory,
+            callingScene: this.callingScene,
+            account: this.account,
+            pausedByInventory: pausedByInventory,
+          });
+        } else {
+          console.error(
+            `[UIScene] Player inventory not found in scene: ${this.callingScene}`
+          );
+        }
+      } else {
+        console.error(
+          `[UIScene] Could not find source scene: ${this.callingScene}`
+        );
       }
     });
 
@@ -228,7 +272,11 @@ export class UIScene extends Phaser.Scene {
   showLocationChoices() {
     if (this._locationOverlay) return;
 
-    if (this.homeScene.isStaking && this.homeScene.guessMade) {
+    if (
+      this.callingScene === "HomeScene" &&
+      this.homeScene.isStaking &&
+      this.homeScene.guessMade
+    ) {
       return;
     }
 
@@ -321,6 +369,7 @@ export class UIScene extends Phaser.Scene {
     });
   }
 
+
   async selectLocation(location) {
     if (this._locationOverlay) {
       this._locationOverlay.destroy();
@@ -345,61 +394,61 @@ export class UIScene extends Phaser.Scene {
       .setDepth(2501)
       .setScrollFactor(0);
 
-    const result = await chooseLocation(location);
+    // --- THIS IS THE UNIFIED LOGIC ---
+    const gameScene = this.scene.get(this.callingScene);
+    const result = await chooseLocation(location, gameScene.playerId || gameScene.account);
+
     if (!result) {
       feedbackText.setText("Error: Game session not found.");
       this.time.delayedCall(2000, () => {
-        this.scene.stop("HomeScene");
-        this.scene.start("MenuScene");
+        gameScene.scene.stop(this.callingScene);
+        gameScene.scene.start("MenuScene");
       });
       return;
     }
 
     if (result.is_correct) {
       feedbackText.setText(`Investigation successful!`);
-
-      this.time.delayedCall(1500, async () => {
-        const homeScene = this.scene.get("HomeScene");
-
-        let baseScore = 0;
-
-        const difficultyMultipliers = {
-          "Very Easy": 0.5,
-          Easy: 1,
-          Medium: 1.5,
-          Hard: 2,
-        };
-        const difficultyMultiplier = difficultyMultipliers[this.difficulty] || 1;
-        const timeBonus = Math.max(0, 600 - this.elapsedSeconds) * 10 * difficultyMultiplier;
-        const guessPenalty = homeScene.guessCount * 500 * difficultyMultiplier;
-        const nftBonus = homeScene.nftCount * 2000 * difficultyMultiplier;
-        const finalScore = baseScore + timeBonus - guessPenalty + nftBonus;
-
-        this.scene.stop("HomeScene");
-        this.scene.stop("UIScene");
-        this.scene.start("EndScene", {
-          score: Math.round(finalScore),
-          time: this.formatTime(this.elapsedSeconds),
-          guesses: homeScene.guessCount,
-          nfts: homeScene.nftCount,
-          account: this.account,
-          story: result.story,
-          isCorrect: true,
-          isStaking: homeScene.isStaking,
-          elapsedTime: this.elapsedSeconds,
-          timeLimit: homeScene.timeLimit,
-        });
-      });
-    } else {
-      feedbackText.setText(`Nothing found at ${location}. Try again.`);
-      this.homeScene.guessCount++;
-      if (this.homeScene.isStaking) {
-        this.homeScene.guessMade = true;
+      // For multiplayer, emit the 'game_won' event
+      if (this.callingScene === "MultiplayerScene" && gameScene.ws && gameScene.ws.readyState === WebSocket.OPEN) {
+        console.log("Correct guess! Notifying server that game is won.");
+        gameScene.ws.send(JSON.stringify({ type: "game_won" }));
       } else {
-        // Lock location button and change text for non-staking wrong guess
-        this.homeScene.wrongLocationChosen = true;
+        // Handle single-player win logic (which transitions to EndScene)
+        this.time.delayedCall(1500, () => {
+          // ... (existing single-player score calculation and scene transition) ...
+          const difficultyMultipliers = { "Very Easy": 0.5, Easy: 1, Medium: 1.5, Hard: 2 };
+          const difficultyMultiplier = difficultyMultipliers[this.difficulty] || 1;
+          const timeBonus = Math.max(0, 600 - this.elapsedSeconds) * 10 * difficultyMultiplier;
+          const guessPenalty = gameScene.guessCount * 500 * difficultyMultiplier;
+          const nftBonus = gameScene.nftCount * 2000 * difficultyMultiplier;
+          const finalScore = timeBonus - guessPenalty + nftBonus;
+
+          this.scene.stop("HomeScene");
+          this.scene.stop("UIScene");
+          this.scene.start("EndScene", {
+            score: Math.round(finalScore),
+            time: this.formatTime(this.elapsedSeconds),
+            guesses: gameScene.guessCount,
+            nfts: gameScene.nftCount,
+            account: this.account,
+            story: result.story,
+            isCorrect: true,
+            isStaking: gameScene.isStaking,
+            elapsedTime: this.elapsedSeconds,
+            timeLimit: gameScene.timeLimit,
+            playerId: this.account,
+          });
+        });
       }
-      this.updateLocationButtonState();
+    } else {
+      // This block now handles incorrect guesses for BOTH modes
+      feedbackText.setText(`Nothing found at ${location}. Try again.`);
+      gameScene.guessCount = (gameScene.guessCount || 0) + 1;
+      gameScene.wrongLocationChosen = true;
+      
+      this.updateLocationButtonState(); // Explicitly update the UI
+      
       this.time.delayedCall(2000, () => {
         feedbackText.destroy();
       });
@@ -409,8 +458,6 @@ export class UIScene extends Phaser.Scene {
   update() {
     if (this.elapsedSeconds >= 5 && !this.locationButtonEnabled) {
       this.locationButtonEnabled = true;
-      this.locationButton.setBackgroundColor("#d4af37");
-      this.locationButton.setColor("#000000");
       this.updateLocationButtonState();
     }
   }
@@ -432,15 +479,13 @@ export class UIScene extends Phaser.Scene {
   updateLocationButtonState() {
     if (!this.locationButton) return;
 
-    if (this.homeScene.isStaking && this.homeScene.guessMade) {
-      this.locationButton.setText("Pay 0.01 0G to Guess Again");
+    const gameScene = this.scene.get(this.callingScene);
+
+    if (gameScene && gameScene.wrongLocationChosen) {
+      this.locationButton.setText("Deposit 0.001 G");
       this.locationButton.setBackgroundColor("#992222");
       this.locationButton.setColor("#ffffff");
-    } else if (this.homeScene.wrongLocationChosen) {
-      this.locationButton.setText("Deposit 0.01 G");
-      this.locationButton.setBackgroundColor("#992222"); // Red color for penalty
-      this.locationButton.setColor("#ffffff");
-      this.locationButtonEnabled = true; // Keep button interactive for deposit
+      this.locationButtonEnabled = true;
     } else {
       this.locationButton.setText("Choose Location");
       if (this.locationButtonEnabled) {

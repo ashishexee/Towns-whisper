@@ -1,6 +1,11 @@
 import Phaser from "phaser";
 import { getConversation, chooseLocation, setCurrentGameId } from "../api.js";
-
+import {
+  GAME_ITEMS_ABI,
+  CONTRACT_ADDRESSES,
+  STAKING_MANAGER_ABI,
+} from "../../contracts_eth/config.js";
+import { ethers } from "ethers";
 export class MultiplayerScene extends Phaser.Scene {
   constructor() {
     super({ key: "MultiplayerScene" });
@@ -12,7 +17,7 @@ export class MultiplayerScene extends Phaser.Scene {
     this.nearbyVillager = null;
     this.interactionText = null;
     this.gameData = null;
-    this.playerInventory = new Set();
+    this.playerInventory = new Map();
     this.activeMintZone = null;
     this.mintText = null;
     this.gameWon = false;
@@ -20,6 +25,79 @@ export class MultiplayerScene extends Phaser.Scene {
     this.worldInitialized = false;
     this.account = null;
     this.mintKey = null;
+    this.playerLight = null;
+    this.wrongLocationChosen = false;
+  }
+
+  async updateInventory() {
+    if (!this.account || typeof window.ethereum === "undefined") {
+      console.log("Wallet not connected, skipping inventory update.");
+      return;
+    }
+
+    try {
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const gameItemsContract = new ethers.Contract(
+        CONTRACT_ADDRESSES.gameItems,
+        GAME_ITEMS_ABI,
+        provider
+      );
+      const transferToFilter = gameItemsContract.filters.Transfer(
+        null,
+        this.account
+      );
+      const transferFromFilter = gameItemsContract.filters.Transfer(
+        this.account,
+        null
+      );
+
+      const transferToEvents = await gameItemsContract.queryFilter(
+        transferToFilter,
+        0,
+        "latest"
+      );
+      const transferFromEvents = await gameItemsContract.queryFilter(
+        transferFromFilter,
+        0,
+        "latest"
+      );
+
+      const ownedTokenIds = new Map();
+
+      for (const event of transferToEvents) {
+        const tokenId = event.args.tokenId.toString();
+        ownedTokenIds.set(tokenId, true);
+      }
+
+      for (const event of transferFromEvents) {
+        const tokenId = event.args.tokenId.toString();
+        ownedTokenIds.set(tokenId, false);
+      }
+
+      this.playerInventory.clear();
+
+      for (const [tokenId, isOwned] of ownedTokenIds.entries()) {
+        if (isOwned) {
+          try {
+            const [name] = await gameItemsContract.getItem(tokenId);
+            const itemName = name.replace(/ /g, "_").toUpperCase();
+            this.playerInventory.set(itemName, tokenId);
+          } catch (e) {
+            console.warn(
+              `Could not fetch details for token ID ${tokenId}. It might have been traded in.`,
+              e
+            );
+          }
+        }
+      }
+
+      console.log(
+        "Player inventory updated from blockchain:",
+        Array.from(this.playerInventory.entries())
+      );
+    } catch (error) {
+      console.error("Failed to update inventory from blockchain:", error);
+    }
   }
 
   preload() {
@@ -67,6 +145,7 @@ export class MultiplayerScene extends Phaser.Scene {
 
   init(data) {
     console.log("MultiplayerScene: Initializing with data:", data);
+    console.log("ACCOUNT IN MULTIPLAYER SCENE:", data.account);
 
     this.roomId = data.roomId;
     this.playerId = data.playerId;
@@ -89,7 +168,7 @@ export class MultiplayerScene extends Phaser.Scene {
     }
   }
 
-  create() {
+  async create() {
     console.log("MultiplayerScene: Creating scene...");
 
     if (!this.roomId || !this.playerId) {
@@ -100,7 +179,26 @@ export class MultiplayerScene extends Phaser.Scene {
 
     this.createWorld();
     this.setupUI();
+    this.lights.enable();
 
+    if (this.account) {
+      await this.updateInventory();
+    }
+
+    if (!this.scene.isActive("UIScene")) {
+      this.scene.launch("UIScene", {
+        account: this.account,
+        inaccessibleLocations: this.gameData
+          ? this.gameData.inaccessible_locations
+          : [],
+        callingScene: "MultiplayerScene",
+      });
+    }
+
+    this.scene.bringToTop("UIScene");
+    this.scene.bringToTop("InventoryScene");
+    this.lights.setAmbientColor(0x101020);
+ 
     this.physics.world.setBounds(0, 0, 60 * this.tileSize, 40 * this.tileSize);
 
     if (this.gameData) {
@@ -146,6 +244,12 @@ export class MultiplayerScene extends Phaser.Scene {
       return;
     }
 
+    if (typeof window.ethereum === 'undefined') {
+      console.error("MetaMask or a compatible wallet is not installed.");
+      this.showErrorMessage("Please install a wallet like MetaMask.");
+      return;
+    }
+
     this.input.keyboard.enabled = false;
     const mintingStatusText = this.add
       .text(
@@ -164,33 +268,89 @@ export class MultiplayerScene extends Phaser.Scene {
       .setScrollFactor(0);
 
     try {
-      console.log(`Simulating mint for: ${itemName}`);
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const signer = await provider.getSigner();
 
-      console.log("Mint successful!");
-      mintingStatusText.setText(`${itemName} minted successfully!`);
+      const gameItemsContract = new ethers.Contract(
+        CONTRACT_ADDRESSES.gameItems,
+        GAME_ITEMS_ABI,
+        signer
+      );
 
-      this.playerInventory.add(itemName);
+      const itemNameFormatted = itemName.replace(/_/g, ' ');
+      const tokenURI = `https://your-metadata-server.com/items/${itemName.toLowerCase()}.json`;
+      const description = `A trusty ${itemNameFormatted} for your adventures.`;
 
-      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-        this.ws.send(
-          JSON.stringify({
-            type: "item_minted",
-            itemName: itemName,
-          })
+      mintingStatusText.setText("Please confirm in wallet...");
+
+      const tx = await gameItemsContract.mintItemTo(
+        this.account,
+        tokenURI,
+        itemNameFormatted,
+        description
+      );
+
+      mintingStatusText.setText("Transaction sent. Waiting for confirmation...");
+      const receipt = await tx.wait();
+
+      console.log("Mint successful! Transaction:", receipt.hash);
+
+      let tokenId = null;
+      const transferEvent = receipt.logs
+        .map(log => {
+          try {
+            return gameItemsContract.interface.parseLog(log);
+          } catch (e) {
+            return null;
+          }
+        })
+        .find(event =>
+          event &&
+          event.name === 'Transfer' &&
+          event.args.to.toLowerCase() === this.account.toLowerCase()
         );
-      }
 
-      this.villagers.getChildren().forEach((villager) => {
-        if (villager.lockIcon && villager.requiredItem === itemName) {
-          villager.lockIcon.setVisible(false);
+      if (transferEvent) {
+        tokenId = transferEvent.args.tokenId.toString();
+        console.log(`Parsed tokenId: ${tokenId} for item: ${itemName}`);
+        mintingStatusText.setText(`${itemNameFormatted} minted successfully!`);
+
+        this.playerInventory.set(itemName, tokenId);
+
+        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+          this.ws.send(
+            JSON.stringify({
+              type: "item_minted",
+              itemName: itemName,
+              tokenId: tokenId,
+            })
+          );
         }
-      });
+
+        this.villagers.getChildren().forEach((villager) => {
+          if (villager.lockIcon && villager.requiredItem === itemName) {
+            villager.lockIcon.setVisible(false);
+          }
+        });
+
+        if (this.activeMintZone && this.activeMintZone.itemName === itemName) {
+          this.updateMintZoneText(itemName);
+        }
+      } else {
+        console.error("Could not find a valid 'Transfer' event to parse the tokenId.");
+        mintingStatusText.setText(`Minted, but item verification failed.`);
+      }
     } catch (error) {
       console.error("Minting failed:", error);
-      mintingStatusText.setText(`Minting failed. See console for details.`);
+      let errorMessage = "Minting failed. See console.";
+      if (error.code === 'ACTION_REJECTED') {
+        errorMessage = "Transaction rejected.";
+      } else if (error.reason) {
+        errorMessage = `Minting failed: ${error.reason}`;
+      }
+      mintingStatusText.setText(errorMessage);
     } finally {
-      this.time.delayedCall(2000, () => {
+      this.time.delayedCall(3000, () => {
         mintingStatusText.destroy();
         this.input.keyboard.enabled = true;
       });
@@ -248,6 +408,32 @@ export class MultiplayerScene extends Phaser.Scene {
       .setDepth(100)
       .setScrollFactor(0)
       .setVisible(!this.gameData);
+
+    // Add a start button for the room creator
+    this.startGameButton = this.add
+      .text(
+        this.cameras.main.centerX,
+        this.cameras.main.centerY + 50,
+        "Start Game",
+        {
+          fontSize: "24px",
+          color: "#00ff00",
+          backgroundColor: "rgba(0,0,0,0.8)",
+          padding: { x: 20, y: 10 },
+        }
+      )
+      .setOrigin(0.5)
+      .setDepth(100)
+      .setScrollFactor(0)
+      .setInteractive()
+      .on("pointerdown", () => {
+        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+          console.log("Creator is starting the game...");
+          this.ws.send(JSON.stringify({ type: "start_game" }));
+          this.startGameButton.setVisible(false);
+        }
+      })
+      .setVisible(false); // Initially hidden
   }
 
   connectToServer() {
@@ -267,7 +453,7 @@ export class MultiplayerScene extends Phaser.Scene {
 
     try {
       this.ws = new WebSocket(
-        `ws://localhost:8000/ws/${this.roomId}/${this.playerId}`
+        `wss://towns-whisper-backend-0g-storage.onrender.com/ws/${this.roomId}/${this.playerId}`
       );
 
       this.ws.onopen = () => {
@@ -322,6 +508,14 @@ export class MultiplayerScene extends Phaser.Scene {
       case "room_joined":
         console.log("Joined room successfully");
         this.updatePlayerList(data.players);
+        // Show start button if the current player is the creator (first player)
+        if (
+          data.players &&
+          data.players.length > 0 &&
+          data.players.id === this.playerId
+        ) {
+          this.startGameButton.setVisible(true);
+        }
         break;
 
       case "player_moved":
@@ -357,7 +551,7 @@ export class MultiplayerScene extends Phaser.Scene {
       otherPlayer = this.add.sprite(x, y, "player");
       otherPlayer.setTint(0xff0000);
       otherPlayer.setDisplaySize(this.tileSize, this.tileSize);
-      otherPlayer.setScale(0.08);
+      otherPlayer.setScale(0.08).setPipeline("Light2D");
       this.otherPlayers.set(playerId, otherPlayer);
       const nameLabel = this.add
         .text(x, y - 20, `Player ${playerId.slice(0, 8)}`, {
@@ -577,7 +771,11 @@ export class MultiplayerScene extends Phaser.Scene {
       tileY * this.tileSize + 16,
       texture
     );
-    villager.setOrigin(0.5).setDisplaySize(32, 32).setScale(scaleSize);
+    villager
+      .setOrigin(0.5)
+      .setDisplaySize(32, 32)
+      .setScale(scaleSize)
+      .setPipeline("Light2D");
 
     villager.name = id;
     villager.requiredItem = requiredItem;
@@ -611,7 +809,7 @@ export class MultiplayerScene extends Phaser.Scene {
     this.player = this.physics.add.sprite(pixelX, pixelY, "player_down");
     this.player.setTint(0x00ff00);
     this.player.setDisplaySize(this.tileSize, this.tileSize);
-    this.player.setScale(0.08);
+    this.player.setScale(0.08).setPipeline("Light2D");
     this.player.setCollideWorldBounds(true);
 
     this.player.currentDirection = "down";
@@ -621,6 +819,10 @@ export class MultiplayerScene extends Phaser.Scene {
     this.cameras.main.setFollowOffset(0, 0);
     this.cameras.main.setLerp(0.1, 0.1);
     this.cameras.main.setZoom(2.5);
+    this.playerLight = this.lights
+      .addLight(pixelX, pixelY, 100)
+      .setColor(0xaaccff)
+      .setIntensity(1.0);
 
     console.log("Player sprite created successfully with physics");
   }
@@ -699,47 +901,119 @@ export class MultiplayerScene extends Phaser.Scene {
   }
 
   async handleGuess(location) {
-    if (this.gameWon) return;
+    // if (this.gameWon) return;
 
-    try {
-      const result = await chooseLocation(location, this.playerId);
-      if (result && result.is_correct) {
-        this.gameWon = true;
+    // try {
+    //   const result = await chooseLocation(location, this.playerId);
+    //   const uiScene = this.scene.get("UIScene");
 
-        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-          this.ws.send(
-            JSON.stringify({
-              type: "game_won",
-              location: location,
-              is_true_ending: result.is_true_ending,
-            })
-          );
-        }
-
-        this.winnerText
-          .setText(`🎉 YOU WON! 🎉\n${result.message}`)
-          .setVisible(true);
-      }
-    } catch (error) {
-      console.error("Error making guess:", error);
-    }
+    //   if (result && result.is_correct) {
+    //     // --- THIS IS THE KEY CHANGE ---
+    //     // The guess was correct. Tell the server we won.
+    //     console.log("Correct guess! Notifying server that game is won.");
+    //     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+    //       this.ws.send(JSON.stringify({ type: "game_won" }));
+    //     }
+        
+    //   }
+    //   else if (result && result.requires_deposit) {
+    //     this.wrongLocationChosen = true;
+    //     this.showErrorMessage(result.message);
+        
+    //     if (uiScene) {
+    //       uiScene.updateLocationButtonState();
+    //     }
+        
+    //   } else {
+    //     // Handle other cases or generic incorrect guess messages
+    //     this.showErrorMessage(result ? result.message : "An unknown error occurred.");
+    //   }
+    // } catch (error) {
+    //   console.error("Error making guess:", error);
+    //   this.showErrorMessage("An error occurred while making a guess.");
+    // }
+    console.log('handleguess called')
   }
 
   handleGameEnd(winnerId, winnerName) {
     this.gameWon = true;
+    this.input.keyboard.enabled = false;
+
+    // Create a semi-transparent background
+    const rect = this.add.rectangle(
+      this.cameras.main.centerX,
+      this.cameras.main.centerY,
+      500,
+      200,
+      0x000000,
+      0.8
+    );
+    rect.setOrigin(0.5).setScrollFactor(0).setDepth(99);
+    rect.setStrokeStyle(2, 0xffd700);
+
+    let titleText, messageText;
 
     if (winnerId === this.playerId) {
-      this.winnerText
-        .setText(`🎉 YOU WON! 🎉\nCongratulations!`)
-        .setVisible(true);
+      titleText = this.add.text(
+        this.cameras.main.centerX,
+        this.cameras.main.centerY - 40,
+        "🎉 Congratulations! 🎉",
+        {
+          fontSize: "32px",
+          color: "#FFD700",
+          fontStyle: "bold",
+          align: "center",
+        }
+      ).setOrigin(0.5).setScrollFactor(0).setDepth(100);
+
+      messageText = this.add.text(
+        this.cameras.main.centerX,
+        this.cameras.main.centerY + 20,
+        "You have won the game!",
+        {
+          fontSize: "24px",
+          color: "#FFFFFF",
+          align: "center",
+        }
+      ).setOrigin(0.5).setScrollFactor(0).setDepth(100);
+
     } else {
-      this.winnerText
-        .setText(`🏆 ${winnerName} Won! 🏆\nBetter luck next time!`)
-        .setVisible(true);
+      titleText = this.add.text(
+        this.cameras.main.centerX,
+        this.cameras.main.centerY - 40,
+        "🏆 Game Over 🏆",
+        {
+          fontSize: "32px",
+          color: "#FFD700",
+          fontStyle: "bold",
+          align: "center",
+        }
+      ).setOrigin(0.5).setScrollFactor(0).setDepth(100);
+
+      messageText = this.add.text(
+        this.cameras.main.centerX,
+        this.cameras.main.centerY + 20,
+        `${winnerName} has won the game.\nBetter luck next time!`,
+        {
+          fontSize: "20px",
+          color: "#FFFFFF",
+          align: "center",
+        }
+      ).setOrigin(0.5).setScrollFactor(0).setDepth(100);
+    }
+
+    // Hide the old winnerText if it exists
+    if (this.winnerText) {
+      this.winnerText.setVisible(false);
     }
 
     this.time.delayedCall(5000, () => {
-      this.scene.start("HomeScene");
+      if (this.ws) {
+        this.ws.onclose = null; 
+        this.ws.close();
+      }
+      // Reload the entire application to go back to the landing page
+      window.location.reload();
     });
   }
 
@@ -755,8 +1029,9 @@ export class MultiplayerScene extends Phaser.Scene {
         this.occupiedGrid[y][x] = false;
         this.add
           .image(x * this.tileSize, y * this.tileSize, "background")
-          .setOrigin(0)
-          .setDisplaySize(this.tileSize, this.tileSize);
+         .setOrigin(0)
+         .setDisplaySize(this.tileSize, this.tileSize)
+         .setPipeline("Light2D");
       }
     }
 
@@ -833,7 +1108,8 @@ export class MultiplayerScene extends Phaser.Scene {
             .image(pixelX, pixelY, tileTexture)
             .setOrigin(0.5)
             .setDisplaySize(this.tileSize, this.tileSize)
-            .setAngle(angle);
+           .setAngle(angle)
+           .setPipeline("Light2D");
         }
       }
     }
@@ -965,8 +1241,9 @@ export class MultiplayerScene extends Phaser.Scene {
       .setOrigin(0)
       .setDisplaySize(
         effectiveTileWidth * tileSize,
-        effectiveTileHeight * tileSize
-      );
+       effectiveTileHeight * tileSize
+      )
+     .setPipeline("Light2D");
   }
 
   isWalkableAt(worldX, worldY) {
@@ -992,6 +1269,10 @@ export class MultiplayerScene extends Phaser.Scene {
   }
 
   update() {
+    if (this.playerLight) {
+      this.playerLight.x = this.player.x;
+      this.playerLight.y = this.player.y;
+    }
     if (this.activeMintZone) {
       if (!this.player) {
         this.mintText.setVisible(false);
@@ -1132,6 +1413,27 @@ export class MultiplayerScene extends Phaser.Scene {
     }
   }
 
+  showErrorMessage(message) {
+    const errorText = this.add.text(
+      this.cameras.main.centerX,
+      this.cameras.main.centerY,
+      message,
+      {
+        fontSize: "24px",
+        color: "#ff4444",
+        backgroundColor: "rgba(0,0,0,0.8)",
+        padding: { x: 20, y: 10 },
+      }
+    )
+      .setOrigin(0.5)
+      .setDepth(101)
+      .setScrollFactor(0);
+
+    this.time.delayedCall(3000, () => {
+      errorText.destroy();
+    });
+  }
+
   shutdown() {
     if (this.ws) {
       this.ws.close();
@@ -1140,6 +1442,64 @@ export class MultiplayerScene extends Phaser.Scene {
     if (this.connectionTimeout) {
       clearTimeout(this.connectionTimeout);
       this.connectionTimeout = null;
+    }
+  }
+
+  async payGuessPenalty() {
+    if (!this.wrongLocationChosen) {
+      console.log("No penalty required.");
+      return true;
+    }
+    if (!this.account) {
+      this.showErrorMessage("Wallet not connected.");
+      return false;
+    }
+
+    this.input.keyboard.enabled = false;
+    const statusText = this.add.text(
+      this.cameras.main.centerX, this.cameras.main.centerY,
+      "Submitting 0.01 0G penalty...",
+      { fontSize: "24px", color: "#d4af37", backgroundColor: "rgba(0,0,0,0.8)", padding: { x: 20, y: 10 } }
+    ).setOrigin(0.5).setDepth(101).setScrollFactor(0);
+
+    try {
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const signer = await provider.getSigner();
+      const stakingContract = new ethers.Contract(CONTRACT_ADDRESSES.stakingManager, STAKING_MANAGER_ABI, signer);
+
+      statusText.setText("Please confirm in wallet...");
+      const penaltyAmount = ethers.parseEther("0.001");
+      
+      const tx = await stakingContract.depositFundsForHint({ value: penaltyAmount });
+
+      statusText.setText("Transaction sent. Waiting for confirmation...");
+      await tx.wait();
+
+      statusText.setText("Penalty paid successfully!");
+
+       this.wrongLocationChosen = false;
+      const uiScene = this.scene.get("UIScene");
+      if (uiScene) {
+        uiScene.updateLocationButtonState();
+      }
+      
+      this.time.delayedCall(2000, () => {
+        statusText.destroy();
+        this.input.keyboard.enabled = true;
+      });
+      return true;
+    } catch (error) {
+      console.error("Penalty payment failed:", error);
+      let errorMessage = "Penalty payment failed.";
+      if (error.code === 'ACTION_REJECTED') {
+        errorMessage = "Transaction rejected.";
+      }
+      statusText.setText(errorMessage);
+      this.time.delayedCall(3000, () => {
+        statusText.destroy();
+        this.input.keyboard.enabled = true;
+      });
+      return false;
     }
   }
 }

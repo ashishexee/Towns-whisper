@@ -12,6 +12,14 @@ Guided by a mysterious disembodied voice (powered by Text-to-Speech), you begin 
 
 ![System Architecture](assets/towns_whispers_flow.svg)
 
+### 0G MAINNET Deployed Contracts
+*   **User Registry:** `0xdb408c192627ed0f58a9a649398b5e63e2a891ab` - [Verified Contract](https://chainscan.0g.ai/address/0xdb408c192627ed0f58a9a649398b5e63e2a891ab?tab=contract-viewer)
+*   **Game Items:** `0xda3208af06f0a436426363ab48faf4aef2d2dd17` - [Verified Contract](https://chainscan.0g.ai/address/0xda3208af06f0a436426363ab48faf4aef2d2dd17?tab=contract-viewer)
+*   **Staking Manager:** `0x0fd3d54cd0f292d1b85ec069d3e6f09072050d33` - [Verified Contract](https://chainscan.0g.ai/address/0x0fd3d54cd0f292d1b85ec069d3e6f09072050d33?tab=contract-viewer)
+
+
+### STORAGE Submissions
+You can view storage submissions on the mainnet here: [0G Mainnet Explorer](https://explorer.0g.ai/mainnet/blockchain/accounts/0xda7b4319693628233ee3b3957543941edc5ffac6/submissions)
 ## Use of 0G Stack
 
 ### Decentralized AI
@@ -24,6 +32,7 @@ The `bridge_server` is the core component of our decentralized AI integration. I
 4.  **On-Chain Verification:** After receiving the AI-generated narrative, the server verifies the response on-chain. This ensures the integrity of the content and prevents tampering.
 
 This decentralized approach to AI not only enhances the game's dynamism but also adds a layer of security and transparency that would be difficult to achieve with a traditional centralized AI service.
+
 
 ### 0G Storage
 
@@ -86,67 +95,28 @@ We disperse the following events to ensure a complete, verifiable game history:
    - Player join events
    - Game initialization parameterss
 
-#### Data Flow Example: Player Wins Game
 
-1. **Frontend**: Player defeats final boss
-   ```javascript
-   daService.disperseCriticalEvent(
-     { player: "0xABC...", outcome: "victory", time: 450 },
-     "Player Victory",
-     "0xABC...",
-     "GAME_VICTORY"
-   );
-   ```
+### Intelligent NFT (iNFT) Integration
 
-2. **Storage Service**: Wraps with metadata, sends via gRPC
-   ```json
-   {
-     "timestamp": "2025-10-20T12:34:56Z",
-     "description": "Player Victory",
-     "data": { "player": "0xABC...", "outcome": "victory", "time": 450 }
-   }
-   ```
+Our game features a unique Intelligent NFT (iNFT) that represents your in-game progress and narrative. This iNFT evolves as you play, creating a dynamic and personalized gaming experience.
 
-3. **DA Client**: Batches with other events
-   ```
-   Batch #1234: [Player Victory, Room Created, User Login]
-   Merkle Root: 0xDEADBEEF...
-   ```
+![iNFT Flow](assets/inft_flow.svg)
 
-4. **Encoder**: Applies erasure coding
-   ```
-   Original: 250 bytes → Encoded: 500 bytes (2x redundancy)
-   Chunks: 10 pieces distributed to storage nodes
-   ```
+The iNFT integration is designed to be seamless and secure, with a clear separation of concerns between the game client, backend services, and the blockchain. Here’s how it works:
 
-5. **Blockchain**: Merkle root committed
-   ```
-   Transaction: 0x789ABC...
-   Block: 2,975,123
-   Status: FINALIZED
-   ```
+1.  **Game Client:** The frontend of our game is responsible for capturing player actions and dialogue. It communicates with our Python backend to send this information and receive updates on the game state. The game client is not directly aware of the iNFT, which allows us to keep the frontend lightweight and focused on the user experience.
 
-6. **Result**: Returns `request_id` to frontend
-   ```json
-   {
-     "result": "SUCCESS",
-     "request_id": "3c66a548...81a9-31373..."
-   }
-   ```
+2.  **Python Backend:** Our Python backend, built with FastAPI, acts as the central hub for game logic. It manages the game state, processes player inputs, and generates responses from our AI-powered NPCs. When a game session ends, the backend sends the complete dialogue history to our `0g_storage_service`.
 
-#### Retrieval Flow
+3.  **`0g_storage_service`:** This Node.js service is the heart of our iNFT system. It is responsible for:
+    *   **Metadata Generation:** It takes the dialogue history and generates new metadata for the iNFT, reflecting the player’s unique journey.
+    *   **IPFS Integration:** It uploads the metadata to IPFS, ensuring it is decentralized and tamper-proof.
+    *   **Encryption:** It encrypts the metadata, so only the owner of the iNFT can view it.
+    *   **Smart Contract Interaction:** It interacts with our `narrativeINFT.sol` smart contract to mint new iNFTs and update existing ones.
 
-When a player returns, their history can be reconstructed:
+4.  **Smart Contract:** Our `narrativeINFT.sol` smart contract is an ERC-721 compliant NFT that includes additional features for iNFTs. It stores the iNFT’s metadata hash and ownership information on the blockchain, making it secure, verifiable, and tradable.
 
-```javascript
-// 1. Get all request_ids for the player
-const events = await daService.getPlayerEvents(walletAddress);
-// Returns: { GAME_START: [...], GAME_VICTORY: [...], USER_LOGIN: [...] }
-
-// 2. Retrieve specific event data
-const victoryData = await daService.retrieveBlob(request_id);
-// Returns: { player: "0xABC...", outcome: "victory", time: 450 }
-```
+This architecture allows us to create a dynamic and engaging gaming experience, where every player’s journey is unique and recorded on the blockchain as an evolving iNFT.
 
 ## Screenshots
 
@@ -252,10 +222,9 @@ Towns-whisper/
     npm run dev
     ```
 
-## Smart Contracts
-
-### Deployed Addresses
+### Testnet Deployed Addresses
 
 *   **User Registry:** `0x5133fa99d718111fb6a708bee4ffe935fb529d1b`
 *   **Game Items:** `0xf80c2f2ac5ed19f609071c06efd21eab686436f5`
 *   **Staking Manager:** `0x0d6c4d4046cdf8ca49ffaae4cf10b6bf7f1d7dc9`
+*   **iNFT Contract:** `0x494d8E03605E297F936a6F244B7BcD03e4563D7E`

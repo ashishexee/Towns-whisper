@@ -8,7 +8,7 @@ import { ItemLockScene } from '../scenes/ItemlockScene';
 import { MultiplayerScene } from '../scenes/MultiplayerScene';
 import { UIScene } from '../scenes/UIScene';
 import { InventoryScene } from '../scenes/InventoryScene';
-import {EndScene} from '../scenes/EndScene'
+import {EndScene} from '../scenes/EndScene';
  
 const PhaserGame = ({ gameConfig }) => {
   const gameRef = useRef(null);
@@ -50,15 +50,14 @@ const PhaserGame = ({ gameConfig }) => {
     // Start the appropriate scene based on game mode
     if (gameConfig?.isMultiplayer) {
       console.log('Starting multiplayer game with config:', gameConfig);
-      // Start directly with MultiplayerScene for multiplayer
-      game.scene.start('MultiplayerScene', {
-        roomId: gameConfig.roomId,
-        playerId: gameConfig.playerId,
-        difficulty: gameConfig.difficulty || 'medium',
-        gameData: gameConfig.gameData
-      });
+      // Multiplayer also needs to go through the LoadingScene
+      const multiplayerConfig = {
+        ...gameConfig,
+        nextScene: 'MultiplayerScene'
+      };
+      game.scene.start('LoadingScene', multiplayerConfig);
     } else {
-      // Start with LoadingScene for single player
+      // Start with LoadingScene for single player, which defaults to VideoScene next
       game.scene.start('LoadingScene', gameConfig);
     }
 

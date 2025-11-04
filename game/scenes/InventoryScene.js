@@ -4,7 +4,8 @@ export class InventoryScene extends Phaser.Scene {
   constructor() {
     super({ key: "InventoryScene" });
     this.account = null;
-    this.playerInventory = new Map();
+    this.playerInventory = [];
+    this.callingScene = null;
     
     // Item to image mapping - using available assets as placeholders
     this.itemImageMap = {
@@ -20,16 +21,31 @@ export class InventoryScene extends Phaser.Scene {
   }
 
   init(data) {
+    console.log("[InventoryScene] Initializing with data:", data);
     this.account = data ? data.account : null;
-    if (data && data.playerInventory) {
-      this.playerInventory = data.playerInventory;
-    }
+    this.playerInventory =
+      data && data.inventory ? data.inventory : new Map();
+    this.callingScene = data && data.callingScene ? data.callingScene : null;
+    this.pausedByInventory =
+      data && data.pausedByInventory ? data.pausedByInventory : false;
+    console.log(
+      "[InventoryScene] Inventory after init:",
+      this.playerInventory
+    );
   }
 
   create() {
+    console.log("[InventoryScene] Creating scene...");
     // Create dark overlay background
     const overlay = this.add
-      .rectangle(0, 0, this.cameras.main.width, this.cameras.main.height, 0x000000, 0.8)
+      .rectangle(
+        0,
+        0,
+        this.cameras.main.width,
+        this.cameras.main.height,
+        0x000000,
+        0.8
+      )
       .setOrigin(0)
       .setDepth(0);
 
@@ -58,12 +74,6 @@ export class InventoryScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setDepth(2);
 
-    // Get inventory items from the calling scene
-    const homeScene = this.scene.get('HomeScene');
-    if (homeScene && homeScene.playerInventory) {
-      this.playerInventory = homeScene.playerInventory;
-    }
-
     // Display inventory items
     this.displayInventoryItems(panelX, panelY, panelWidth, panelHeight);
 
@@ -82,16 +92,22 @@ export class InventoryScene extends Phaser.Scene {
   }
 
   displayInventoryItems(panelX, panelY, panelWidth, panelHeight) {
-    const itemsArray = Array.from(this.playerInventory.entries());
-    
+    const inventoryMap = this.playerInventory;
+    const itemsArray = Array.from(inventoryMap.entries());
+
     if (itemsArray.length === 0) {
       // Show empty inventory message
       this.add
-        .text(this.cameras.main.centerX, this.cameras.main.centerY, "Your inventory is empty", {
-          fontFamily: "Arial",
-          fontSize: "24px",
-          color: "#888888",
-        })
+        .text(
+          this.cameras.main.centerX,
+          this.cameras.main.centerY,
+          "Your inventory is empty",
+          {
+            fontFamily: "Arial",
+            fontSize: "24px",
+            color: "#888888",
+          }
+        )
         .setOrigin(0.5)
         .setDepth(2);
       return;
@@ -102,17 +118,27 @@ export class InventoryScene extends Phaser.Scene {
     const itemWidth = 150;
     const itemHeight = 120;
     const itemSpacing = 20;
-    const startX = panelX + (panelWidth - (itemsPerRow * itemWidth + (itemsPerRow - 1) * itemSpacing)) / 2;
+    const startX =
+      panelX +
+      (panelWidth - (itemsPerRow * itemWidth + (itemsPerRow - 1) * itemSpacing)) /
+        2;
     const startY = panelY + 80;
 
     itemsArray.forEach(([itemName, tokenId], index) => {
       const row = Math.floor(index / itemsPerRow);
       const col = index % itemsPerRow;
-      
+
       const itemX = startX + col * (itemWidth + itemSpacing);
       const itemY = startY + row * (itemHeight + itemSpacing);
 
-      this.createInventoryItemBox(itemX, itemY, itemWidth, itemHeight, itemName, tokenId);
+      this.createInventoryItemBox(
+        itemX,
+        itemY,
+        itemWidth,
+        itemHeight,
+        itemName,
+        tokenId
+      );
     });
   }
 
@@ -192,8 +218,11 @@ export class InventoryScene extends Phaser.Scene {
   }
 
   closeInventory() {
-    // Resume the home scene
-    this.scene.resume('HomeScene');
+    console.log("[InventoryScene] Closing inventory.");
+    if (this.callingScene && this.pausedByInventory) {
+      console.log(`[InventoryScene] Resuming scene: ${this.callingScene}`);
+      this.scene.resume(this.callingScene);
+    }
     this.scene.stop();
   }
 }

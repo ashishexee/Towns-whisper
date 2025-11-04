@@ -277,8 +277,11 @@ async def guess(game_id: str, request: GuessRequest):
     game_state = active_games[game_id]
     is_correct = request.location_name == game_state.correct_location
     
+    player_id = request.player_id
+    is_multiplayer = player_id is not None
+
     # Use player-specific state for ending calculation
-    player_key = request.player_id if hasattr(request, 'player_id') and request.player_id else "single_player"
+    player_key = player_id if is_multiplayer else "single_player"
     player_state = game_state.multiplayer_states.get(player_key, game_state.player_state)
     
     key_clues = [node['node_id'] for node in game_state.quest_network.get('nodes', []) if node.get('key_clue')]
@@ -286,20 +289,47 @@ async def guess(game_id: str, request: GuessRequest):
     is_true_ending = len(discovered_key_clues) == len(key_clues)
 
     message = ""
+    requires_deposit = False
+
     if is_correct:
         message += f"You head towards {request.location_name} and find your friends, alive. "
         if is_true_ending:
             message += "You understand the full, dark truth of the village. CONGRATULATIONS, TRUE ENDING!"
         else:
             message += "You never fully understood why they were taken. YOU WIN, BUT THE MYSTERY REMAINS..."
-    else:
-        message = f"You find nothing but silence and dust at {request.location_name}. Your friends are gone forever. The correct location was {game_state.correct_location}. GAME OVER."
+        
+        if is_multiplayer:
+            room_id = manager.player_to_room.get(player_id)
+            if room_id and room_id in multiplayer_rooms and not multiplayer_rooms[room_id].get("winner"):
+                multiplayer_rooms[room_id]["winner"] = player_id
+                
+                # Find player name
+                player_name = f"Player_{player_id[:8]}" # Default name
+                for conn in manager.active_connections.get(room_id, []):
+                    if conn["player_id"] == player_id:
+                        player_name = conn["player_name"]
+                        break
+
+                await manager.broadcast_to_room({
+                    "type": "game_ended",
+                    "winner": player_id,
+                    "winner_name": player_name,
+                    "message": message
+                }, room_id)
+
+    else: # Incorrect guess
+        if is_multiplayer:
+            message = f"You find nothing but silence and dust at {request.location_name}. Your friends are not here. Deposit 0.01G to try again."
+            requires_deposit = True
+        else: # Single player game over
+            message = f"You find nothing but silence and dust at {request.location_name}. Your friends are gone forever. The correct location was {game_state.correct_location}. GAME OVER."
 
     return GuessResponse(
         message=message,
         is_correct=is_correct,
         is_true_ending=is_true_ending,
-        story=message
+        story=message,
+        requires_deposit=requires_deposit
     )
 
 # --- CHEST ENDPOINTS FOR RUNE TOKEN SYSTEM ---
@@ -784,6 +814,12 @@ async def websocket_endpoint(websocket: WebSocket, room_id: str, player_id: str)
             "players": manager.get_room_players(room_id),
             "room": multiplayer_rooms.get(room_id, {})
         }))
+
+        # Notify existing players that a new player has joined
+        await manager.broadcast_to_room({
+            "type": "update_players",
+            "players": manager.get_room_players(room_id)
+        }, room_id, exclude_websocket=websocket)
         
         while True:
             data = await websocket.receive_text()
@@ -849,8 +885,7 @@ async def websocket_endpoint(websocket: WebSocket, room_id: str, player_id: str)
         
         # Notify other players that this player left
         await manager.broadcast_to_room({
-            "type": "player_left",
-            "playerId": player_id,
+            "type": "update_players",
             "players": manager.get_room_players(room_id)
         }, room_id)
 

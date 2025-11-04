@@ -9,6 +9,7 @@ from typing import List, Dict, Optional
 class NewGameRequest(BaseModel):
     difficulty: str = "medium"
     num_inaccessible_locations: int = 5
+    player_id: Optional[str] = None
 
 class NewGameResponse(BaseModel):
     game_id: str
@@ -63,3 +64,13 @@ class ChestRewardResponse(BaseModel):
     amount: int
     schedule_id: str
     execution_time: str
+
+class DialogueEntry(BaseModel):
+    timestamp: str
+    villager_name: str
+    villager_id: str
+    player_prompt: str
+    npc_dialogue: Optional[str]
+
+class DialogueHistoryRequest(BaseModel):
+    dialogues: List[DialogueEntry]

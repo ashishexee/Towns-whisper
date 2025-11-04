@@ -13,6 +13,9 @@ export class DialogueScene extends Phaser.Scene {
         this.voices = [];
         this._currentSpeechResolve = null;
         this._currentSpeechTimer = null;
+
+        // Add this at the class level to track all dialogues
+        this.dialogueHistory = []; // Track all dialogues
     }
 
     init(data) {
@@ -331,6 +334,25 @@ export class DialogueScene extends Phaser.Scene {
                 this.closeDialogue();
             }, 2000);
         }
+    }
+
+    // When you receive NPC dialogue response, store it
+    async displayDialogue(npcName, npcDialogue, playerMessage) {
+        // Add to history
+        this.dialogueHistory.push({
+            timestamp: new Date().toISOString(),
+            villager_name: npcName,
+            villager_id: npcName.toLowerCase(),
+            player_prompt: playerMessage,
+            npc_dialogue: npcDialogue,
+        });
+        
+        console.log(`📝 Dialogue tracked. Total: ${this.dialogueHistory.length}`);
+    }
+
+    // Expose history for other scenes
+    getDialogueHistory() {
+        return this.dialogueHistory;
     }
 
     shutdown() {

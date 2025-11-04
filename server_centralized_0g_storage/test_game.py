@@ -5,7 +5,7 @@ import requests
 import json
 import os
 
-BASE_URL = "http://127.0.0.1:8000"
+BASE_URL = "https://towns-whisper-backend-0g-storage.onrender.com"
 
 def start_new_game(difficulty):
     """Starts a new game with the chosen difficulty."""

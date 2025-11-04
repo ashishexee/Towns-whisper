@@ -1,4 +1,4 @@
-const API_BASE_URL = "http://127.0.0.1:8000";
+const API_BASE_URL = "https://towns-whisper-backend-0g-storage.onrender.com";
 let currentGameId = null;
 
 /**
@@ -12,10 +12,14 @@ export function setCurrentGameId(gameId) {
     currentGameId = gameId;
 }
 
-async function startNewGame(difficulty) {
+async function startNewGame(difficulty, playerId = null) {
   try {
     console.log("Difficulty level - ", difficulty);
-    const response = await fetch(`${API_BASE_URL}/game/new`, {
+    let url = `${API_BASE_URL}/game/new`;
+    if (playerId) {
+      url += `?player_id=${playerId}`;
+    }
+    const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -72,10 +76,7 @@ async function getConversation(villagerId, playerMessage, playerId = null) {
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        villager_id: villagerId,
-        player_prompt: playerMessage, // CHANGED: was player_message
-      }),
+      body: JSON.stringify(requestBody),
     });
     
     if (!response.ok) {
@@ -132,13 +133,6 @@ async function chooseLocation(location, playerId = null) {
 
     const data = await response.json();
     
-    // --- NEW: Call the end game endpoint after a guess is made ---
-    // This ensures the dialogue history is saved regardless of win or lose.
-    if (currentGameId && data.is_correct) {
-      await endGame(playerId);
-    }
-    // --- END NEW CODE ---
-
     return data;
 
   } catch (error) {
@@ -147,41 +141,6 @@ async function chooseLocation(location, playerId = null) {
   }
 }
 
-/**
- * Notifies the backend that the game session has ended to save dialogue history.
- * @param {string | null} playerId The ID of the player ending the session.
- * @returns {Promise<void>}
- */
-async function endGame(playerId = null) {
-  if (!currentGameId) {
-    console.error("Cannot end game: no active game ID.");
-    return;
-  }
-
-  try {
-    const response = await fetch(`${API_BASE_URL}/game/end`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        game_id: currentGameId,
-        // Use 'single_player' as a fallback if no player ID is provided
-        player_id: playerId || 'single_player',
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const result = await response.json();
-    console.log('Game end acknowledged by server:', result.message);
-
-  } catch (error) {
-    console.error("Error ending game:", error);
-  }
-}
 
 /**
  * Sets the current game ID.
@@ -202,10 +161,41 @@ async function pingServer() {
   }
 }
 
+async function endGame(playerId) {
+  if (!currentGameId) {
+    console.error("Cannot end game: no active game ID.");
+    return null;
+  }
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/game/end`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        game_id: currentGameId,
+        player_id: playerId,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log('Game ended:', data);
+    return data;
+  } catch (error) {
+    console.error("Error ending game:", error);
+    return null;
+  }
+}
+
 export { 
   startNewGame, 
   getConversation, 
   chooseLocation, 
   pingServer,
-  endGame // --- NEW EXPORT ---
+  endGame
 };

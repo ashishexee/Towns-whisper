@@ -38,6 +38,8 @@ export class HomeScene extends Phaser.Scene {
     this.timeLimit = null;
     this.movingVillagers = null;
     this.movingVillagerPaths = []; 
+    this.inftTokenId = null;
+    this.inftManager = null;
   }
 
   init(data) {
@@ -254,8 +256,11 @@ export class HomeScene extends Phaser.Scene {
 
     console.log("diffulty - ", this.difficulty);
 
+    statusText.setText("Fetching dialogue history from 0G Storage...");
+
     const { game_id, inaccessible_locations, villagers } = await startNewGame(
-      this.difficulty
+      this.difficulty,
+      this.account
     );
 
     progressTimer.destroy();
@@ -980,7 +985,8 @@ export class HomeScene extends Phaser.Scene {
     }
   }
 
-  async initiateConversation(villager) {
+  // Track dialogues when interacting with villagers
+async initiateConversation(villager) {
     this.input.keyboard.enabled = false;
     this.player.setVelocity(0, 0);
 
@@ -988,7 +994,9 @@ export class HomeScene extends Phaser.Scene {
     this.sound.play("villager_accept", { volume: 6 });
     console.log(villager.name);
 
-    const conversationData = await getConversation(villager.name, "Hello");
+    const playerMessage = "Hello";
+
+    const conversationData = await getConversation(villager.name, playerMessage, this.account);
 
     this.input.keyboard.enabled = true;
     this.interactionText.setText("Press ENTER to talk");
@@ -999,13 +1007,35 @@ export class HomeScene extends Phaser.Scene {
         conversationData: conversationData,
         newGameData: this.gameData,
         villagerSpriteKey: villager.texture.key,
+        playerId: this.account,
       });
+
+      // Store dialogue in history
+      const dialogueScene = this.scene.get("DialogueScene");
+      if (dialogueScene && dialogueScene.displayDialogue) {
+        dialogueScene.displayDialogue(
+          villager.name,
+          conversationData.npc_dialogue,
+          playerMessage
+        );
+      }
     } else {
       console.error(
         "Could not fetch conversation for villager:",
         villager.name
       );
     }
+  }
+
+  // Pass dialogue history when game ends
+  handleGameEnd(winnerId) {
+    const dialogueScene = this.scene.get("DialogueScene");
+    const dialogueHistory = dialogueScene ? dialogueScene.getDialogueHistory() : [];
+    
+    this.scene.start("EndScene", {
+      dialogueHistory: dialogueHistory,
+      // ... other data ...
+    });
   }
 
   createMovingVillagers() {
@@ -1350,7 +1380,7 @@ export class HomeScene extends Phaser.Scene {
     this.input.keyboard.enabled = false;
     this.player.setVelocity(0, 0);
     
-    getConversation(this.nearbyVillager.name, "I'd like to talk.")
+    getConversation(this.nearbyVillager.name, "I'd like to talk.", this.account)
       .then(conversationData => {
         console.log("Conversation data received:", conversationData);
         
@@ -1358,7 +1388,8 @@ export class HomeScene extends Phaser.Scene {
           this.scene.launch("DialogueScene", {
             conversationData: conversationData,
             villagerSpriteKey: this.nearbyVillager.texture.key,
-            newGameData: this.gameData
+            newGameData: this.gameData,
+            playerId: this.account
           });
           this.scene.pause();
         } else {
@@ -1546,7 +1577,7 @@ export class HomeScene extends Phaser.Scene {
       const stakingContract = new ethers.Contract(CONTRACT_ADDRESSES.stakingManager, STAKING_MANAGER_ABI, signer);
 
       statusText.setText("Please confirm in wallet...");
-      const penaltyAmount = ethers.parseEther("0.01");
+      const penaltyAmount = ethers.parseEther("0.001");
       
       const tx = await stakingContract.depositFundsForHint({ value: penaltyAmount });
 
@@ -1707,4 +1738,119 @@ export class HomeScene extends Phaser.Scene {
     }
   }
 
+  async initializeGameINFT() {
+    try {
+        console.log('🎮 Initializing Game INFT...');
+        console.log('🔑 Account:', this.account);
+        console.log('🎯 Difficulty:', this.difficulty);
+
+        if (!this.account) {
+            console.error('❌ No account available for INFT creation');
+            return;
+        }
+
+        // Get player's keypair (in production, derive from wallet)
+        console.log('🔐 Generating player keypair...');
+        const playerKeypair = await this.generatePlayerKeypair();
+        console.log('✅ Keypair generated:', {
+            publicKey: playerKeypair.publicKey.substring(0, 20) + '...',
+            hasSecretKey: !!playerKeypair.secretKey
+        });
+
+        console.log('📡 Making INFT creation request...');
+        const response = await fetch('https://towns-whisper-0g-storage-service.onrender.com/inft/create', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                playerAddress: this.account,
+                gameMode: 'single_player',
+                difficulty: this.difficulty,
+                ownerPublicKey: playerKeypair.publicKey // Send public key
+            })
+        });
+
+        console.log('📡 Response status:', response.status);
+        
+        if (response.ok) {
+            const result = await response.json();
+            console.log('🎉 INFT creation response:', result);
+            
+            this.inftTokenId = result.tokenId;
+            this.playerPublicKey = playerKeypair.publicKey;
+            this.playerSecretKey = playerKeypair.secretKey; // Store locally (in-memory only)
+            
+            console.log(`✅ Game INFT #${this.inftTokenId} created`);
+            this.showINFTNotification('Your Narrative INFT has been born! It will evolve as you play.');
+        } else {
+            const errorText = await response.text();
+            console.error('❌ INFT creation failed:', response.status, errorText);
+        }
+    } catch (error) {
+        console.error('❌ Failed to initialize Game INFT:', error);
+    }
+}
+
+async generatePlayerKeypair() {
+    // In production, derive from wallet's signature or use a secure enclave
+    // For now, generate and store locally
+    if (this.playerKeypair) return this.playerKeypair;
+
+    const response = await fetch('https://towns-whisper-0g-storage-service.onrender.com/crypto/generate-keypair', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            playerAddress: this.account
+        })
+    });
+
+    if (response.ok) {
+        const keypair = await response.json();
+        this.playerKeypair = keypair;
+        return keypair;
+    }
+
+    throw new Error('Failed to generate keypair');
+}
+
+async updateINFTProgress() {
+    if (!this.inftTokenId || !this.account || !this.playerPublicKey) return;
+
+    try {
+        const gameProgressData = {
+            tokenId: this.inftTokenId,
+            playerAddress: this.account,
+            villagerInteractions: this.getVillagerInteractionCount(),
+            itemsCollected: this.playerInventory.size,
+            collectedItemNames: Array.from(this.playerInventory.keys()),
+            penaltiesPaid: this.calculatePenaltiesPaid(),
+            currentScore: this.calculateCurrentScore(),
+            progressPercentage: this.calculateGameProgress(),
+            version: this.gameProgressVersion || 1,
+            playDurationSeconds: Math.floor((Date.now() - this.gameStartTime) / 1000)
+        };
+
+        const response = await fetch('https://towns-whisper-0g-storage-service.onrender.com/inft/evolve', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                tokenId: this.inftTokenId,
+                gameProgressData,
+                ownerPublicKey: this.playerPublicKey // Send public key for re-encryption
+            })
+        });
+
+        if (response.ok) {
+            const result = await response.json();
+            console.log(`🌱 INFT evolved to stage: ${result.newStage}`);
+
+            if (result.newStage !== 'newborn') {
+                this.showINFTNotification(`Your Guide has evolved to ${result.newStage}!`);
+            }
+
+            this.gameProgressVersion = (this.gameProgressVersion || 1) + 1;
+        }
+    } catch (error) {
+        console.error('❌ Failed to update INFT progress:', error);
+    }
+}
 }

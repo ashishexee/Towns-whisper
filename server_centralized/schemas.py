@@ -36,6 +36,7 @@ class GuessResponse(BaseModel):
     is_true_ending: bool
     message: str
     story: Optional[str] = None
+    requires_deposit: bool = False
 
 # Rune Token / Chest system schemas
 class OpenChestRequest(BaseModel):

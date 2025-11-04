@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { ethers } from 'ethers';
 import PhaserGame from './components/phaserGame';
 import Hero from './components/landing';
@@ -12,7 +12,8 @@ import UserRegistration from './components/UserRegistration';
 import { UserRegistryService } from './utils/userRegistry';
 import RoomLobby from './components/RoomLobby';
 import { CONTRACT_ADDRESSES, STAKING_MANAGER_ABI } from '../contracts_eth/config';
-import { daService } from './services/daService'; // 1. Import the DA service
+import { daService } from './services/daService';
+import { pingServer, setCurrentGameId } from './api';
 
 function App() {
   const [currentView, setCurrentView] = useState('landing');
@@ -121,6 +122,9 @@ function App() {
     }
 
     try {
+
+      pingServer().catch(err => console.warn("Ping failed (ignored):", err));
+      console.log("🔗 Pinging backend server (non-blocking)...");
       const provider = new ethers.BrowserProvider(window.ethereum);
       const signer = await provider.getSigner();
       const address = await signer.getAddress();
@@ -138,10 +142,10 @@ function App() {
         setCurrentView('gameMode');
         console.log("Returning user:", userInfo.username);
         // DA EVENT: Log when a returning user connects
-  daService.disperseCriticalEvent(
-    { player: address, username: userInfo.username },
-    "Returning User Connected"
-  );
+        daService.disperseCriticalEvent(
+          { player: address, username: userInfo.username },
+          "Returning User Connected"
+        );
       } else {
         setCurrentView('registration');
         console.log("New user, showing registration");
@@ -188,7 +192,7 @@ function App() {
     
     try {
       console.log('Creating room...');
-      const response = await fetch('http://127.0.0.1:8000/create_room', {
+      const response = await fetch('https://towns-whisper-backend-0g-storage.onrender.com/create_room', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -262,7 +266,11 @@ function App() {
     setCurrentView('gameMode');
   };
 
-  const handleStartGame = (gameData) => {
+  const handleCloseLobby = useCallback(() => {
+    setShowLobby(false);
+  }, []);
+
+  const handleStartGame = useCallback((gameData) => {
     console.log('Starting multiplayer game with data:', gameData);
     
     setGameConfig({
@@ -270,12 +278,13 @@ function App() {
       isMultiplayer: true,
       roomId: roomId,
       playerId: walletAddress,
-      gameData: gameData
+      gameData: gameData,
+      account: walletAddress
     });
     
     setCurrentView('game');
     setShowLobby(false);
-  };
+  }, [roomId, walletAddress]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -373,7 +382,7 @@ function App() {
             <RoomLobby 
               roomId={roomId} 
               onStart={handleStartGame}
-              onClose={() => setShowLobby(false)}
+              onClose={handleCloseLobby}
               playerId={walletAddress}
             />
           )}
