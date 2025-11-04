@@ -13,6 +13,7 @@ import { UserRegistryService } from './utils/userRegistry';
 import RoomLobby from './components/RoomLobby';
 import { CONTRACT_ADDRESSES, STAKING_MANAGER_ABI } from '../contracts_eth/config';
 import { daService } from './services/daService';
+import { pingServer, setCurrentGameId } from './api';
 
 function App() {
   const [currentView, setCurrentView] = useState('landing');
@@ -121,6 +122,9 @@ function App() {
     }
 
     try {
+
+      pingServer().catch(err => console.warn("Ping failed (ignored):", err));
+      console.log("🔗 Pinging backend server (non-blocking)...");
       const provider = new ethers.BrowserProvider(window.ethereum);
       const signer = await provider.getSigner();
       const address = await signer.getAddress();
@@ -138,10 +142,10 @@ function App() {
         setCurrentView('gameMode');
         console.log("Returning user:", userInfo.username);
         // DA EVENT: Log when a returning user connects
-  daService.disperseCriticalEvent(
-    { player: address, username: userInfo.username },
-    "Returning User Connected"
-  );
+        daService.disperseCriticalEvent(
+          { player: address, username: userInfo.username },
+          "Returning User Connected"
+        );
       } else {
         setCurrentView('registration');
         console.log("New user, showing registration");
